@@ -45,7 +45,7 @@ footer .label { color: var(--muted); font-size: 11px; letter-spacing: .1em; text
 .chip:hover { border-color: var(--cyan); }
 .chip i { font-style: normal; margin-right: 5px; }
 #agents { margin-left: auto; color: var(--muted); font-size: 12px; padding-left: 16px; }
-#banner { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 5px 14px; border-radius: 999px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; background: rgba(251,191,36,.12); color: var(--gold); border: 1px solid rgba(251,191,36,.35); display: none; }
+#banner { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); white-space: nowrap; padding: 5px 14px; border-radius: 999px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; background: rgba(251,191,36,.12); color: var(--gold); border: 1px solid rgba(251,191,36,.35); display: none; }
 .flow { animation: flow 1.1s linear infinite; } .flow.fast { animation-duration: .45s; }
 @keyframes flow { to { stroke-dashoffset: -20; } }
 .breathe { animation: breathe 3.2s ease-in-out infinite; transform-origin: 500px 250px; transform-box: view-box; }
@@ -60,6 +60,7 @@ footer .label { color: var(--muted); font-size: 11px; letter-spacing: .1em; text
   #stage { height: 62vw; min-height: 300px; }
   aside { border-left: 0; border-top: 1px solid var(--line); }
   .feed { max-height: 40vh; }
+  #banner { left: 10px; bottom: auto; top: 8px; transform: none; font-size: 10.5px; padding: 3px 10px; }
 }
 </style>
 </head>
@@ -406,8 +407,9 @@ async function showAudit(a) {
     row.innerHTML = `<span style="color:${C.gold}">⚑</span> <b style="color:${C.gold}"></b> <span class="muted"></span>`;
     row.children[1].textContent = `${f.worker}: ${f.label}`; row.children[2].textContent = f.detail.length > 60 ? f.detail.slice(0, 59) + '…' : f.detail;
     box.appendChild(row);
+    // The badge keeps the first (main) cheat; later flags go to the audit list only.
     const w = workers.get(f.worker);
-    if (w) { w.badge.textContent = `⚑ ${f.label}`; w.badge.setAttribute('fill', C.gold); burst(w.slot, C.gold, 60); }
+    if (w && !w.flagged) { w.flagged = true; w.badge.textContent = `⚑ ${f.label}`; w.badge.setAttribute('fill', C.gold); burst(w.slot, C.gold, 60); }
     bump('cheats', 1);
     await wait(260);
   }
