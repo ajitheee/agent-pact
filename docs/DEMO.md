@@ -22,7 +22,16 @@ pay only after the work is verified."*
 
 > ⚠ These figures come from the build brief. Check each one against its source before saying it on stage.
 
-**0:45–2:15 · Live demo** (`npm run live`; the right column is what's on screen)
+**0:45–2:15 · Live demo.** The audience watches the dashboard (`npm run dashboard`, then open http://localhost:3100
+full screen). You start the run from a small terminal with `npm run live -- --with-worker-b`; Claude Desktop (worker B)
+sits in a corner. Every motion on the dashboard is a real event from the escrow's log:
+- the poster's job post flies into the vault, and bids arrive as beams with price tags;
+- money flows into the escrow on a Stripe hold;
+- a delivery drops into the Blaxel sandbox, which scans it;
+- on a fail, the coins fly back to the poster; on a pass, they fly to the worker;
+- then the output types in, and the monitor sweeps the arena and lights up its flags.
+
+The right column below is what the terminal shows; the dashboard shows the same beats.
 
 | Say | Screen |
 |---|---|
@@ -106,6 +115,9 @@ a ledger.
          run took 61 seconds.
 - [ ] If you deployed since Claude Desktop last started, quit and reopen it, so worker B gets the current tool list
       (including `wait_seconds`, which lets it wait for the task instead of checking in a tight loop).
+- [ ] `npm run dashboard` and open http://localhost:3100 full screen (F11) on the projector. Click a chip in the bottom
+      strip to replay a past job: that's also the fallback if the network dies mid-demo (replays need only the
+      database).
 - [ ] Set the terminal to a large font, maximize it, and turn off notifications. The screen is a presenter view: one
       line per market event. `npm run live -- --verbose` shows every tool call instead, for debugging.
 
@@ -116,7 +128,7 @@ The poster waits up to 90 seconds for bids, so keep talking if there's a pause.
 **If something breaks**
 | Problem | Do this |
 |---|---|
-| Wi-Fi or the venue network is down | Play the backup video. Offline fallback: `npm run demo`, which runs fully local with in-memory payments and email |
+| Wi-Fi or the venue network is down | Replay last night's runs on the dashboard (bottom strip), or play the backup video. Offline fallback: `npm run demo`, which runs fully local with in-memory payments and email |
 | A `connect attempt 1 failed … retrying` line | Harmless: the worker reconnects. The warm-up makes it rare |
 | Claude Code can't authenticate | Check `ANTHROPIC_API_KEY` and `ANTHROPIC_WORKSPACE_ID` in `.env`, then rerun |
 | The poster prints "Credit balance is too low" | The API key's account is out of credits. Add credits in the Anthropic Console (Billing) for that account, then rerun |

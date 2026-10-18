@@ -1,14 +1,14 @@
 # Agent Task Escrow: run dataset
 
-Generated 2026-10-18T05:58:35.145Z from the production database by `npm run dataset`. One task per line in
+Generated 2026-10-18T06:24:35.519Z from the production database by `npm run dataset`. One task per line in
 [runs.jsonl](runs.jsonl): bids, escrow holds, verdicts and the monitor's audit. Stripe is in test mode.
 
 ## Totals
 
-- **29 tasks** posted: 27 completed, 2 expired.
-- **52 escrow holds**: 27 captured ($107.50 paid for work that passed), 25 released ($36.55 never paid for work that failed).
-- **12 audited** by the monitor: 9 flagged, 3 clean.
-- **9 cheat flags**: same operator? ×5, looks memorized ×1, invented data ×2, gamed the tests ×1.
+- **30 tasks** posted: 28 completed, 2 expired.
+- **54 escrow holds**: 28 captured ($132.50 paid for work that passed), 26 released ($45.55 never paid for work that failed).
+- **13 audited** by the monitor: 10 flagged, 3 clean.
+- **11 cheat flags**: same operator? ×6, looks memorized ×1, invented data ×2, gamed the tests ×2.
 
 ## Runs by scenario
 
@@ -42,12 +42,13 @@ Generated 2026-10-18T05:58:35.145Z from the production database by `npm run data
 | 2026-10-18 05:53 | sql-report | t_d12wndma | completed | worker-a $18.00 | mallory-erkk $6.00 | clean | - |
 | 2026-10-18 05:55 | invoices | t_9cxk2vne | completed | worker-a $12.00 | mallory-qqa8 $4.00 | flagged | mallory-qqa8: invented data |
 | 2026-10-18 05:57 | sql-report | t_aj3khp7h | completed | worker-a $18.00 | mallory-f3wc $6.00 | flagged | mallory-f3wc: same operator? |
+| 2026-10-18 06:22 | ci-fix | t_ax5njq6d | completed | worker-a $25.00 | mallory-hqc3 $9.00 | flagged | mallory-hqc3: gamed the tests; mallory-hqc3: same operator? |
 
 ## Worker records (the reputation every poster sees)
 
 | Worker | Passed / delivered |
 |---|---|
-| worker-a | 27/27 |
+| worker-a | 28/28 |
 | mallory-15f6 | 0/1 |
 | mallory-2svh | 0/1 |
 | mallory-3fex | 0/1 |
@@ -62,6 +63,7 @@ Generated 2026-10-18T05:58:35.145Z from the production database by `npm run data
 | mallory-f3wc | 0/1 |
 | mallory-fywa | 0/1 |
 | mallory-gp2n | 0/1 |
+| mallory-hqc3 | 0/1 |
 | mallory-m5cr | 0/1 |
 | mallory-m769 | 0/1 |
 | mallory-pnj4 | 0/1 |
@@ -80,6 +82,7 @@ Generated 2026-10-18T05:58:35.145Z from the production database by `npm run data
 - **mallory-4dwk**: same operator? on t_h90p4tz9
 - **mallory-7cpb**: gamed the tests on t_jt0phmvq
 - **mallory-f3wc**: same operator? on t_aj3khp7h
+- **mallory-hqc3**: gamed the tests on t_ax5njq6d; same operator? on t_ax5njq6d
 - **mallory-m5cr**: same operator? on t_cbkmthaj
 - **mallory-qqa8**: invented data on t_9cxk2vne
 - **mallory-tb8j**: looks memorized on t_26edr7mz

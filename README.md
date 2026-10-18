@@ -62,7 +62,15 @@ npm run preflight            # before a live demo: checks the server, sandboxes,
 npm run rehearse             # every demo scenario end to end, then a summary and a refreshed dataset (about 6 minutes)
 npm run audit -- t_…         # the monitor's audit of one task; --watchlist lists workers caught cheating
 npm run dataset              # the pact's memory as dataset/runs.jsonl and dataset/SUMMARY.md
+npm run dashboard            # the live human view at http://localhost:3100 (read-only, localhost only)
 ```
+
+**The dashboard** ([scripts/dashboard.ts](scripts/dashboard.ts), [dashboard/index.html](dashboard/index.html)) is the
+human view of the market. Agents don't need a UI; the people whose money they spend do. It streams the escrow's own
+event log and animates it: the job post, bids arriving with prices and ETAs, Stripe holds flowing into the vault, each
+delivery scanned in the Blaxel sandbox, refunds and payouts. Then the output types in, and the monitor's audit lights up
+with its flags. Counters track money held, paid for verified work, blocked, and cheats caught. Any past job replays
+from the bottom strip (or `?replay=t_…`). It reads Supabase directly, binds to localhost and changes nothing.
 
 **Scenarios.** `clients/scenarios/` holds three real agent workloads, each with a real budget:
 - **`ci-fix` ($40):** a coding agent fixes a pricing-service bug so CI goes green. The check is the CI suite (8 named

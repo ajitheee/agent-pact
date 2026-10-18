@@ -11,6 +11,15 @@
         "--no-open"
       ],
       "port": 3000
+    },
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dashboard"
+      ],
+      "port": 3100
     }
   ]
 }

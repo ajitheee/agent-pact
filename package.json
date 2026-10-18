@@ -19,7 +19,8 @@
     "preflight": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/preflight.ts",
     "audit": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/audit.ts",
     "rehearse": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/rehearse.ts",
-    "dataset": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/dataset.ts"
+    "dataset": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/dataset.ts",
+    "dashboard": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/dashboard.ts"
   },
   "keywords": [],
   "author": "",
