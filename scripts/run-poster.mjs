@@ -3,7 +3,7 @@
 //   npm run poster              final summary only
 //   npm run poster -- --stream  every tool call and result as it happens (used by npm run live)
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -28,7 +28,11 @@ console.log(
     (process.env.ANTHROPIC_WORKSPACE_ID ? ` (workspace ${process.env.ANTHROPIC_WORKSPACE_ID})` : ''),
 );
 const child = spawn(exe, args, { stdio: ['pipe', stream ? 'pipe' : 'inherit', 'inherit'] });
-createReadStream('clients/poster.md').pipe(child.stdin);
+// POSTER_MIN_BIDS=3 (set by `npm run live -- --with-worker-b`) makes the poster wait for a third bid from Claude Desktop.
+let brief = readFileSync('clients/poster.md', 'utf8');
+const minBids = Number(process.env.POSTER_MIN_BIDS ?? 2);
+if (minBids !== 2) brief = brief.replace('at least 2 pending bids or 90 seconds', `at least ${minBids} pending bids or 150 seconds`);
+child.stdin.end(brief);
 if (stream) createInterface({ input: child.stdout }).on('line', render);
 child.on('exit', (code) => process.exit(code ?? 1));
 

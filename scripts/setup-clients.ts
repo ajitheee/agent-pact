@@ -31,12 +31,13 @@ write('.mcp.json', {
   mcpServers: { escrow: { type: 'http', url, headers: { Authorization: `Bearer ${tokens.poster}` } } },
 });
 // Claude Desktop launches stdio servers; mcp-remote bridges to our HTTP endpoint and adds the header.
-// The header goes through env because Windows splits args on spaces.
+// The header goes through env because Windows splits args on spaces. On Windows, npx is a .cmd shim that
+// Claude Desktop can't launch directly, so it goes through cmd.exe.
+const bridge = ['-y', 'mcp-remote@0.15.1', url, '--header', 'Authorization:${ESCROW_AUTH}'];
 write('clients/claude-desktop.local.json', {
   mcpServers: {
     'escrow-worker-b': {
-      command: 'npx',
-      args: ['-y', 'mcp-remote@0.15.1', url, '--header', 'Authorization:${ESCROW_AUTH}'],
+      ...(process.platform === 'win32' ? { command: 'cmd', args: ['/c', 'npx', ...bridge] } : { command: 'npx', args: bridge }),
       env: { ESCROW_AUTH: `Bearer ${tokens['worker-b']}` },
     },
   },

@@ -12,3 +12,4 @@ clients/*.local.json
 .env.deploy
 .env.*
 !.env.example
+*.tmp.*

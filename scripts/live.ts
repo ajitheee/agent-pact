@@ -6,6 +6,10 @@
 //                   run, so every take shows "new agent gets a shot, fails, refunded" instead of a known bad actor.
 //   poster          Claude Code: posts the task, picks the cheapest bid that fits the deadline (Mallory), sees
 //                   her fail and get refunded, filters by reputation, re-awards to worker A, who gets paid.
+//
+//   npm run live -- --with-worker-b   adds the third client: worker B in Claude Desktop (escrow-worker-b server).
+//                   Its prompt goes on the clipboard; paste it in a new chat when the cue appears. The poster
+//                   waits for 3 bids, and worker B's 80¢ / 300s bid loses on the 240s deadline.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -16,6 +20,7 @@ import { newId } from '../src/ids.js';
 import { usd } from '../src/market.js';
 
 const tokens = JSON.parse(readFileSync('clients/tokens.local.json', 'utf8')) as Record<string, string>;
+const withWorkerB = process.argv.includes('--with-worker-b');
 const paint = (code: string, s: string) => `\x1b[${code}m${s}\x1b[0m`;
 const started = Date.now();
 const clock = () => paint('2', `${String(Math.round((Date.now() - started) / 1000)).padStart(4)}s`);
@@ -28,7 +33,13 @@ const malloryToken = await mintToken(db, mallory, domain ? { email: `${mallory}@
 await db.close();
 
 console.log(paint('1', `\nAgent Task Escrow · live run against ${tokens.url}`));
-console.log(paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)\n`));
+console.log(
+  paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}\n`),
+);
+if (withWorkerB && !process.argv.includes('--no-clipboard')) {
+  spawn('powershell', ['-NoProfile', '-Command', "Get-Content -Raw 'clients/worker-b.md' | Set-Clipboard"], { stdio: 'ignore' });
+  console.log(paint('2', "worker B's prompt is on your clipboard. Have a new Claude Desktop chat open and ready.\n"));
+}
 await warmUp();
 
 /**
@@ -89,7 +100,31 @@ const malloryDone = attach(
   node(['--import', 'tsx', 'clients/worker-a.ts', '--as', mallory, '--price', '55', '--eta', '30', '--garbage', '--once'], { ESCROW_AGENT_TOKEN: malloryToken }),
 );
 await new Promise((r) => setTimeout(r, 4000)); // let both workers connect before the task exists
-const poster = attach('poster', '36', node(['scripts/run-poster.mjs', '--stream']), /^\[poster\] /);
+const posterProcess = node(['scripts/run-poster.mjs', '--stream'], withWorkerB ? { POSTER_MIN_BIDS: '3' } : {});
+const poster = attach('poster', '36', posterProcess, /^\[poster\] /);
+if (withWorkerB) cueWorkerB(posterProcess);
+
+/** Once the task is open, tell the presenter to start worker B, and show its bid when it lands. */
+function cueWorkerB(child: ChildProcess) {
+  // Listen alongside the display; never close this reader, because closing it pauses the shared stdout stream.
+  let cued = false;
+  createInterface({ input: child.stdout! }).on('line', async (line) => {
+    const taskId = /"task_id":"(t_[0-9a-z]+)","status":"open"/.exec(line)?.[1];
+    if (!taskId || cued) return;
+    cued = true;
+    console.log(paint('33;1', `\n  ▶ Task ${taskId} is open. In Claude Desktop: paste (Ctrl+V) into the new chat and send.\n`));
+    const watch = await openDb();
+    for (let i = 0; i < 90; i++) {
+      const [bid] = await watch.query<{ price: number; eta_seconds: number }>("SELECT price, eta_seconds FROM bids WHERE task_id = $1 AND worker_id = 'worker-b'", [taskId]);
+      if (bid) {
+        console.log(`${clock()} ${paint('34', 'worker-b'.padStart(13))}  bid ${bid.price}¢, eta ${bid.eta_seconds}s (from Claude Desktop)`);
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    await watch.close();
+  });
+}
 
 const posterExit = await poster;
 await Promise.race([Promise.all([workerA, malloryDone]), new Promise((r) => setTimeout(r, 15_000))]);

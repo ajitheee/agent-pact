@@ -223,6 +223,22 @@ export class Market extends EventEmitter {
   // ─── accept_bid ───────────────────────────────────────────────────────────
 
   async acceptBid(actor: string, input: { task_id: string; bid_id: string }) {
+    // If the transaction fails after Stripe authorized the hold, nothing records it, so release it here
+    // rather than leave the poster's card authorized for days.
+    let placed: { id: string; attemptId: string } | undefined;
+    try {
+      return await this.acceptBidTx(actor, input, (id, attemptId) => (placed = { id, attemptId }));
+    } catch (e) {
+      if (placed) {
+        await this.rail
+          .release(placed.id, { verdict: 'aborted', reason: 'accept_bid did not complete' }, `release-${placed.attemptId}`)
+          .catch((err) => console.error(`[escrow] could not release orphaned hold ${placed!.id}: ${errMsg(err)}`));
+      }
+      throw e;
+    }
+  }
+
+  private acceptBidTx(actor: string, input: { task_id: string; bid_id: string }, onHold: (paymentIntent: string, attemptId: string) => void) {
     return this.write(async (q, log) => {
       const t = await this.lockTask(q, input.task_id);
       if (t.poster_id !== actor) throw new AgentError('not_your_task', { task_id: t.id }, 'Only the poster can accept bids.');
@@ -248,6 +264,7 @@ export class Market extends EventEmitter {
       } catch (e) {
         throw new AgentError('escrow_hold_failed', { detail: errMsg(e) }, 'Nothing was charged. Retry accept_bid or pick another bid.');
       }
+      onHold(hold.id, attemptId);
 
       await q.query(
         `INSERT INTO attempts (id, task_id, bid_id, worker_id, amount, payment_intent, escrow, outcome, created_at)

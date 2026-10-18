@@ -80,6 +80,8 @@ export interface Db extends Queryable {
   close(): Promise<void>;
 }
 
+const TABLES = ['agents', 'tasks', 'bids', 'attempts', 'events', 'email_threads', 'email_sent', 'email_inbox', 'kv'];
+
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS agents (
     id TEXT PRIMARY KEY,
@@ -162,15 +164,20 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
   // Supabase exposes the public schema over its REST API. RLS with no policies shuts that door;
   // this service connects as the table owner, which bypasses RLS.
-  ...['agents', 'tasks', 'bids', 'attempts', 'events', 'email_threads', 'email_sent', 'email_inbox', 'kv'].map(
-    (t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`,
-  ),
+  ...TABLES.map((t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`),
 ];
 
 export async function openDb(opts: { url?: string | null; dir?: string | null } = {}): Promise<Db> {
   const url = opts.url === undefined ? process.env.DATABASE_URL : opts.url;
   const dir = opts.dir === undefined ? (process.env.PGLITE_DIR ?? '.data/pglite') : opts.dir;
   const db = url ? postgresDb(url) : await pgliteDb(dir ?? undefined);
+  // DDL takes exclusive table locks even when it changes nothing (ALTER TABLE … ENABLE ROW LEVEL SECURITY
+  // does), which deadlocks against live transactions. So when every table exists with RLS on, skip it.
+  const [{ n }] = await db.query<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+     WHERE ns.nspname = current_schema() AND c.relkind = 'r' AND c.relrowsecurity AND c.relname IN (${TABLES.map((t) => `'${t}'`).join(', ')})`,
+  );
+  if (n === TABLES.length) return db;
   await db.tx(async (q) => {
     await q.query('SELECT pg_advisory_xact_lock(727201)'); // concurrent instances migrate one at a time
     for (const statement of SCHEMA) await q.query(statement);

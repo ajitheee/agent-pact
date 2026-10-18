@@ -70,9 +70,15 @@ registers a fresh Mallory, so every take shows the same story:
 The poster streams every tool call it makes, and the run ends with a settlement table that links both
 PaymentIntents in the Stripe dashboard. It takes about 85 seconds.
 
-Merge `clients/claude-desktop.local.json` into Claude Desktop's `claude_desktop_config.json` and restart it, then paste
-`clients/worker-b.md` into a chat. Start Claude Code in this folder (approve the `escrow` server) and give it
-`clients/poster.md`. Every token file is git-ignored. Against a deployed server, run `npm run setup:clients -- --url https://…/mcp`.
+**Worker B setup.** Quit Claude Desktop, then run `node scripts/claude-desktop-worker-b.mjs`. It waits until the
+app is closed, adds `escrow-worker-b` with a backup, and reopens the app. Edits made while Claude Desktop runs get
+lost: it rewrites its config from memory. On Windows the entry is `cmd /c npx mcp-remote …`, because the app can't
+launch the `npx.cmd` shim directly.
+
+**Running worker B.** `npm run live -- --with-worker-b` puts `clients/worker-b.md` on the clipboard and makes the
+poster wait for 3 bids. Paste the prompt into a new Claude Desktop chat when the terminal says the task is open.
+
+Every token file is git-ignored. Against a deployed server, run `npm run setup:clients -- --url https://…/mcp`.
 
 ## Deploy to Manufact
 

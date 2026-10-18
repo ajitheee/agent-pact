@@ -28,8 +28,8 @@ pay only after the work is verified."*
 |---|---|
 | "Three agents on three different MCP clients, one escrow server on Manufact." | Header: poster = Claude Code, worker-a = mcp-use, mallory = mcp-use |
 | "The poster needs data it can't produce. It posts a $2 task, and the acceptance criteria are code, not prose: 20 contacts with real names, matching work emails and distinct companies." | `→ post_task … verifier: python` |
-| "Two workers bid within two seconds. Mallory is new and cheapest." | Both `bid` lines |
-| "The poster takes the cheapest bid that fits the deadline. Stripe authorizes 55 cents: held, not moved." | `accept_bid … "status":"held"` |
+| "Workers bid within seconds, from three different clients. Mallory is new and cheapest; worker B in Claude Desktop is cheap but slow." | The `bid` lines, including `worker-b … (from Claude Desktop)` |
+| "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes 55 cents: held, not moved." | The poster's reasoning line, then `accept_bid … "status":"held"` |
 | **"Mallory delivers junk. The verifier runs in a Blaxel sandbox, never on the worker, and fails it. The hold is released, so the poster pays nothing, and Mallory's record drops to zero."** | `verdict FAIL (gmail.com is free mail) · verified in blaxel · escrow released` |
 | "The poster filters by reputation and re-hires worker A." | `list_bids {"min_reputation":0.5}` |
 | "Verified in Blaxel. A dollar fifty captured. No human touched anything." | `verdict PASS · verified in blaxel · escrow captured` |
@@ -53,9 +53,17 @@ pay only after the work is verified."*
       Blaxel sandbox, and it should print `warm-up: … ready` with no errors.
 - [ ] Open the tabs: Stripe test payments (https://dashboard.stripe.com/test/payments) and Primitive (the
       `poster@rosy-finch.primitive.email` inbox, thread view).
-- [ ] Optional third client: restart Claude Desktop and paste `clients/worker-b.md` into a chat. Worker B bids
-      80¢ with a 300s ETA, which doesn't fit the 240s deadline, so the poster passes it over for being too slow.
-      That's the brief's "poster picks on deadline" beat.
+- [ ] Third client, worker B in Claude Desktop (one-time setup). Quit Claude Desktop from the tray icon, then
+      double-click **"Add escrow worker B to Claude Desktop"** on your Desktop. It waits until the app is closed,
+      adds the `escrow-worker-b` server and reopens Claude Desktop. Doing this while the app is running doesn't
+      work: the app rewrites its own config from memory.
+- [ ] With worker B, run `npm run live -- --with-worker-b` instead.
+      1. Worker B's prompt is put on your clipboard. Open a new Claude Desktop chat.
+      2. When the terminal prints **▶ Task … is open**, paste and send. Choose "Always allow" for the
+         `escrow-worker-b` tools.
+      3. The poster waits for all 3 bids. Worker B bids 80¢ with a 300s ETA, cheaper than worker A, but too slow
+         for the 240s deadline, so the poster passes it over and says why. That's the brief's "poster picks on
+         deadline" beat.
 - [ ] Set the terminal to a large font, maximize it, and turn off notifications.
 
 **On stage:** run `npm run live`, narrate from the table above, and say the warm-up line if anyone asks about setup.

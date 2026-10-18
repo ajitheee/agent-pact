@@ -27,13 +27,29 @@ export function registerTools(server: EscrowServer, getMarket: () => Promise<Mar
     const started = Date.now();
     try {
       if (!agentId) throw new AgentError('not_authenticated', {}, 'Send Authorization: Bearer <agent token> with every request.');
-      const data = await fn(await getMarket(), agentId);
+      const market = await getMarket();
+      // A deadlock or serialization victim was rolled back whole, so running the call again is safe:
+      // a failed accept releases its hold, and capture/release are idempotent on Stripe.
+      let data: unknown;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          data = await fn(market, agentId);
+          break;
+        } catch (e) {
+          if (attempt >= 3 || !isConflict(e)) throw e;
+          await new Promise((r) => setTimeout(r, 100 * attempt + Math.random() * 150));
+        }
+      }
       log(agentId, tool, 'ok', started);
       return { content: [{ type: 'text', text: JSON.stringify(data) }] };
     } catch (e) {
       if (e instanceof AgentError) {
         log(agentId ?? '?', tool, e.code, started);
         return { isError: true, content: [{ type: 'text', text: JSON.stringify(e.toJSON()) }] };
+      }
+      if (isConflict(e)) {
+        log(agentId ?? '?', tool, 'conflict_retry', started);
+        return { isError: true, content: [{ type: 'text', text: JSON.stringify({ error_code: 'conflict_retry', fix: 'Another update to this task landed at the same moment. Call it again.' }) }] };
       }
       console.error(`[mcp] ${tool} crashed for ${agentId}:`, e);
       return { isError: true, content: [{ type: 'text', text: JSON.stringify({ error_code: 'internal_error', fix: 'Retry once; if it repeats, the escrow service is unhealthy.' }) }] };
@@ -173,6 +189,12 @@ Example: get_task({"task_id":"t_k3x9q2a1"})
     },
     (args, ctx) => run(ctx.get('agentId'), 'get_task', (m, id) => m.getTask(id, args)),
   );
+}
+
+/** Postgres deadlock (40P01) or serialization failure (40001). */
+function isConflict(e: unknown) {
+  const code = (e as { code?: string })?.code;
+  return code === '40P01' || code === '40001';
 }
 
 function log(agent: string, tool: string, outcome: string, started: number) {

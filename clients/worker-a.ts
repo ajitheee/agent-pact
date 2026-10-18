@@ -64,6 +64,11 @@ for (;;) {
       const bid = await call('bid', { task_id: t.task_id, price, eta_seconds: Number(opts.eta) });
       log(`bid ${bid.bid_id} on ${t.task_id}: ${price}¢, eta ${opts.eta}s (${task.verifier.type} verifier read)`);
     } catch (e: any) {
+      // A transient server error gets another try on the next pass; anything else means this task isn't for us.
+      if (['conflict_retry', 'internal_error'].includes(e.data?.error_code)) {
+        log(`bid on ${t.task_id} hit ${e.data.error_code}; retrying`);
+        continue;
+      }
       log(`skipped ${t.task_id}: ${JSON.stringify(e.data ?? e.message)}`);
     }
     bidOn.add(t.task_id);
