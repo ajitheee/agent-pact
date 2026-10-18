@@ -480,6 +480,8 @@ if (STUDIO) {
   $('banner').remove();
   $('mode').textContent = 'real run · production';
   $('dot').className = 'dot on';
+  // On camera the patch wraps instead of scrolling sideways.
+  document.head.insertAdjacentHTML('beforeend', '<style>#output { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; scrollbar-width: none; }</style>');
 }
 /** Replay a recorded run with each event at a given second (cues.events[i] for the i-th event), then output and audit. */
 window.studioReplay = async (id, cues) => {

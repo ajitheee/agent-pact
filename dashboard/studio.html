@@ -530,7 +530,7 @@ function replayCues(d) {
     if (e.type === 'bid' || e.type === 'rebid') return bids[Math.min(b++, bids.length - 1)];
     if (e.type === 'awarded') return awards[Math.min(a++, awards.length - 1)];
     if (e.type === 'failed') return fails[Math.min(f++, fails.length - 1)];
-    if (e.type === 'passed') return 37.5;
+    if (e.type === 'passed') return 36.5;
     return 43 + i;
   });
   return { events, output: 46, audit: 53 };
@@ -547,8 +547,9 @@ const CUES = [
   [57, () => { zoom('sandbox'); caption('The check runs in a Blaxel sandbox, never on the worker'); }],
   [60.6, () => { zoom('money'); caption('Cheat caught · hold released, the poster pays nothing'); }],
   [65, () => caption('Next bidder: worker A · Stripe holds the money again')],
-  [68.5, () => { zoom('sandbox'); caption('A real fix · every check passes'); }],
-  [72.3, () => { zoom('market'); caption('Paid automatically · no human in the loop'); }],
+  [68, () => { zoom('sandbox'); caption('Worker A delivers · the same check runs again'); }],
+  [70.8, () => caption('A real fix · every check passes')],
+  [72.6, () => { zoom('market'); caption('Paid automatically · no human in the loop'); }],
   [77, () => { zoom('output'); caption('The deliverable: a patch, ready to merge'); }],
   [84, () => { zoom('audit'); caption('Monitor: every step and every payment re-checked'); }],
   [94, () => { zoom('full'); caption(null); }],
