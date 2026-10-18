@@ -1,0 +1,8 @@
+node_modules
+.mcp-use
+.data
+dist
+.env
+.env.*
+.mcp.json
+clients/*.local.json

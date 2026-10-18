@@ -1,0 +1,14 @@
+node_modules/
+*.db
+*.db-shm
+*.db-wal
+.env
+agents.local.json
+.data/
+.mcp-use/
+dist/
+.mcp.json
+clients/*.local.json
+.env.deploy
+.env.*
+!.env.example
