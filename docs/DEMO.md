@@ -89,6 +89,7 @@ The poster waits up to 90 seconds for bids, so keep talking if there's a pause.
 | Wi-Fi or the venue network is down | Play the backup video. Offline fallback: `npm run demo`, which runs fully local with in-memory payments and email |
 | A `connect attempt 1 failed … retrying` line | Harmless: the worker reconnects. The warm-up makes it rare |
 | Claude Code can't authenticate | Check `ANTHROPIC_API_KEY` and `ANTHROPIC_WORKSPACE_ID` in `.env`, then rerun |
+| The poster prints "Credit balance is too low" | The API key's account is out of credits. Add credits in the Anthropic Console (Billing) for that account, then rerun |
 | Production is down | `npm run deploy`, then wait for `npx mcp-use deployments list` to show the new build; it takes about 3 minutes |
 
 **Backup video** (record Sunday morning): `npm run live` full screen, then about 10 seconds each on the Stripe

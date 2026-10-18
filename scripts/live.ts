@@ -166,9 +166,13 @@ const posterExit = await poster;
 await Promise.race([workers, new Promise((r) => setTimeout(r, 15_000))]);
 for (const c of children) if (c.exitCode === null) c.kill();
 
-// Settlement, straight from the database: every escrow hold on the poster's latest task.
+// Settlement, straight from the database: every escrow hold on the task this run posted (30s of slack for clock skew).
 const summary = await openDb();
-const [task] = await summary.query<{ id: string; status: string }>("SELECT id, status FROM tasks WHERE poster_id = 'poster' ORDER BY created_at DESC LIMIT 1");
+const [task] = await summary.query<{ id: string; status: string }>(
+  "SELECT id, status FROM tasks WHERE poster_id = 'poster' AND created_at >= $1 ORDER BY created_at DESC LIMIT 1",
+  [started - 30_000],
+);
+if (!task) console.log(paint('31', '\nThe poster did not post a task in this run; see its output above.'));
 if (task) {
   console.log(paint('1', `\nSettlement for ${task.id} (${task.status})`));
   const attempts = await summary.query<{ worker_id: string; amount: number; outcome: string; escrow: string; payment_intent: string; reason: string | null }>(
