@@ -5,7 +5,7 @@
   "need": "a revenue number for the board deck, as a SQL query you can trust",
   "capability": "data.sql",
   "budget": 3000,
-  "prices": { "worker-a": 1800, "mallory": 600 },
+  "prices": { "worker-a": 900, "mallory": 1600 },
   "check": "It runs the delivered query on 3 databases generated at check time (random customers, orders, lines and refunds, with orders on every quarter boundary) and compares each result with the right answer, so a query that runs fine but returns the wrong number fails.",
   "strength": "runs the query on 3 fresh randomized databases",
   "mallory": "a plausible query with the classic JOIN fan-out: refunds and line items multiplied together",

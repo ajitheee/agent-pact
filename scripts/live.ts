@@ -1,14 +1,15 @@
 // `npm run live`: the whole demo in one terminal, against the server in clients/tokens.local.json
 // (production after `npm run setup:clients -- --url …`). For rehearsals and the backup video.
 //
-//   worker-a        mcp-use client, honest: bids about 60% of the budget / 90s, delivers work that passes the check
-//   mallory-xxxx    mcp-use client, cheapest: bids about 20% of the budget / 30s, delivers work that fails it. A fresh identity each
-//                   run, so every take shows "new agent gets a shot, fails, refunded" instead of a known bad actor.
-//   poster          Claude Code: posts the task, picks the cheapest bid that fits the deadline (Mallory), sees
-//                   her fail and get refunded, filters by reputation, re-awards to worker A, who gets paid.
+//   worker-a        mcp-use client, honest: bids the scenario's price for it / 90s, delivers work that passes the check
+//   mallory-xxxx    mcp-use client: bids the scenario's price for her / 30s, delivers work that fails it. A fresh identity
+//                   each run, so a take shows "new agent gets a shot, fails, refunded" instead of a known bad actor.
+//   poster          Claude Code: posts the task and picks the cheapest bid that fits the deadline. Where Mallory bids
+//                   lowest (ci-fix, invoices) she fails, is refunded, and worker A is hired next and paid. In sql-report
+//                   worker A bids lowest and is paid first time: price alone never says who does the work right.
 //
-//   npm run live -- --scenario sql-report  picks the task from clients/scenarios/ (ci-fix, sql-report, invoices);
-//                   Mallory fails a different way in each. Default: ci-fix. The run ends with the output the poster got.
+//   npm run live -- --scenario sql-report  picks the task from clients/scenarios/ (ci-fix, sql-report, invoices).
+//                   Default: ci-fix. The run ends with the output the poster got.
 //
 //   npm run live -- --with-worker-b   adds the third client: worker B in Claude Desktop (escrow-worker-b server).
 //                   Its prompt goes on the clipboard. Paste and send it before the poster starts: worker B
@@ -27,7 +28,7 @@ import { openDb, type EventRow } from '../src/db.js';
 import { newId } from '../src/ids.js';
 import { usd } from '../src/market.js';
 import { stripeDashboardBase } from '../src/rails.js';
-import { loadScenario } from '../clients/scenarios.js';
+import { loadScenario, malloryUndercuts } from '../clients/scenarios.js';
 import { auditTask, formatAudit } from '../src/audit.js';
 
 const tokens = JSON.parse(readFileSync('clients/tokens.local.json', 'utf8')) as Record<string, string>;
@@ -67,7 +68,7 @@ await db.close();
 
 console.log(paint('1', `\nAgentPact · live run against ${tokens.url}`));
 console.log(
-  paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}`),
+  paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, ${malloryUndercuts(scenario) ? 'lowest bid' : 'higher bid'}, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}`),
 );
 console.log(paint('2', `scenario ${scenario.order}: ${scenario.title} (${scenario.kind}) · ${scenario.strength}\n`));
 if (!verbose) console.log(paint('2', 'presenter view: one line per market event. Add --verbose to see every tool call.\n'));

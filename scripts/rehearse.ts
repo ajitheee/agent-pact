@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadScenario, scenarioNames } from '../clients/scenarios.js';
+import { loadScenario, malloryUndercuts, scenarioNames } from '../clients/scenarios.js';
 import { recalledAudit } from '../src/audit.js';
 import { openDb } from '../src/db.js';
 import { usd } from '../src/market.js';
@@ -46,11 +46,14 @@ for (const r of results) {
   const mallory = attempts.find((a) => a.worker_id.startsWith('mallory'));
   const workerA = attempts.find((a) => a.worker_id === 'worker-a');
   const audit = task ? await recalledAudit(db, task.id) : undefined;
-  const ok = task?.status === 'completed' && mallory?.escrow === 'released' && workerA?.escrow === 'captured' && audit && audit.verdict !== 'broken';
+  // Where Mallory undercuts, she is hired first and her hold released; elsewhere worker A's lower bid wins outright.
+  const undercuts = malloryUndercuts(loadScenario(r.name));
+  const malloryAsExpected = undercuts ? mallory?.escrow === 'released' : !mallory;
+  const ok = task?.status === 'completed' && malloryAsExpected && workerA?.escrow === 'captured' && audit && audit.verdict !== 'broken';
   if (!ok) problems++;
   console.log(
     `  ${ok ? paint('32', '✓') : paint('31', '✗')} ${r.name.padEnd(10)} ${(task?.id ?? 'no task').padEnd(12)} ${(task?.status ?? '-').padEnd(10)} ` +
-      `${(mallory ? `${mallory.outcome}, ${mallory.escrow}` : '-').padEnd(20)} ${(workerA ? `${workerA.outcome} ${usd(workerA.amount)}` : '-').padEnd(16)} ` +
+      `${(mallory ? `${mallory.outcome}, ${mallory.escrow}` : undercuts ? '-' : 'outbid, never hired').padEnd(20)} ${(workerA ? `${workerA.outcome} ${usd(workerA.amount)}` : '-').padEnd(16)} ` +
       `${(audit?.verdict ?? '-').padEnd(9)} ${r.seconds}s`,
   );
 }

@@ -33,6 +33,10 @@ export interface Scenario {
   bad: unknown;
 }
 
+/** Mallory bids under worker A, so she is hired first and caught. Otherwise worker A, the lowest bid, is hired and
+ *  paid outright and Mallory never gets the job. The scenarios mix both, so price never looks like quality. */
+export const malloryUndercuts = (s: Pick<Scenario, 'prices'>) => s.prices.mallory < s.prices['worker-a'];
+
 export function loadScenario(name: string): Scenario {
   const dir = join(ROOT, name);
   if (!existsSync(join(dir, 'scenario.json'))) throw new Error(`no scenario "${name}"; choose one of: ${scenarioNames().join(', ')}`);

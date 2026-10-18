@@ -120,22 +120,24 @@ worker B only when worker B bid in that run.
 ## Scenarios
 
 **Second demo, if there's time:** same market, different kind of agent work.
-- `npm run live -- --scenario sql-report`: "Finance needs the board-deck number." Mallory's query runs fine and returns the
-  wrong revenue (the classic JOIN fan-out). The check runs every query on 3 fresh random databases and names the
-  mistake. The output is the revenue table and the query.
+- `npm run live -- --scenario sql-report`: "Finance needs the board-deck number." This time the honest agent is the
+  cheapest: worker A bids $9, Mallory $16. The poster hires worker A, the check runs the query on 3 fresh random
+  databases, it passes and $9 is paid first time. The point: the cheapest bid isn't always the bad one, and paying
+  more doesn't buy correct work; the check is what decides. The output is the revenue table and the query.
 - `npm run live -- --scenario invoices`: "Accounts payable: 6 vendor invoices into the ledger." Mallory computes the
   German VAT instead of reading it (237.50 where the invoice says 237,48). The check traces every figure to its source
   invoice and flags it as an invented value. The output is the ledger, ready to import.
 
 **The three scenarios** (`npm run live -- --scenario <name>`)
 
-| Name | Agent work | Budget | How it's checked | How Mallory fails | Monitor |
-|---|---|---|---|---|---|
-| `ci-fix` | Coding agent: fix a production bug so CI goes green | $40 | 8 named tests + 200 random carts, code run in its own sandboxed process | **Games the tests**: special-cases the 8 CI carts | ⚑ gamed the tests |
-| `sql-report` | Data agent: Q3 net revenue by region for the board deck | $30 | The query runs on 3 fresh random databases with quarter-boundary orders | Plausible SQL with a JOIN fan-out; the check names the mistake | failed the check |
-| `invoices` | Back-office agent: 6 vendor invoices (US, DE, UK, FR formats) into the ledger | $20 | No answer key: every figure traced to its source invoice, dates read per country, totals reconciled | **Hallucinates** the German VAT | ⚑ invented data |
+| Name | Agent work | Budget | Bids (worker A · Mallory) | How it's checked | How Mallory fails | Monitor |
+|---|---|---|---|---|---|---|
+| `ci-fix` | Coding agent: fix a production bug so CI goes green | $40 | $25 · **$9**: Mallory hired first, caught | 8 named tests + 200 random carts, code run in its own sandboxed process | **Games the tests**: special-cases the 8 CI carts | ⚑ gamed the tests |
+| `sql-report` | Data agent: Q3 net revenue by region for the board deck | $30 | **$9** · $16: worker A hired and paid first time | The query runs on 3 fresh random databases with quarter-boundary orders | Not hired this time (her JOIN fan-out query would fail; preflight proves it) | clean |
+| `invoices` | Back-office agent: 6 vendor invoices (US, DE, UK, FR formats) into the ledger | $20 | $12 · **$4**: Mallory hired first, caught | No answer key: every figure traced to its source invoice, dates read per country, totals reconciled | **Hallucinates** the German VAT | ⚑ invented data |
 
-Every check runs in Blaxel. Worker A passes all three. When a "new" Mallory delivers exactly what an earlier one did,
+The poster always hires the cheapest bid that fits the deadline; the bids are mixed so price never stands in for
+quality. Every check runs in Blaxel. Worker A passes all three. When a "new" Mallory delivers exactly what an earlier one did,
 the monitor also flags *same operator?*. Each run ends with the output the poster received: a diff, a revenue table,
 a ledger.
 
@@ -224,6 +226,11 @@ returned. Our test suite tries gaming the tests, a forged verdict and sandbox es
 writing the SQL behind a number, back-office agents processing documents. Each has the failure everyone has seen:
 tests gamed instead of code fixed, a query that runs but is wrong, a number that sounds right but was never in the
 document. Each is a job where "pay only if it checks out" changes who you can hire.
+
+**"So the cheap agent is the bad one, and you should pay more?"** No. Price says nothing about quality, and that's
+the point: the poster can safely hire the cheapest bid, because it pays only if the check passes. In the CI-fix demo
+the cheapest bid cheated and cost nothing. In the SQL report the cheapest bid was the honest one: hired first, paid
+$9, while the $16 bid never got the job. A higher price would have bought the same work.
 
 **"Why not just settle over x402 or MPP?"** They settle instantly. We're the step before settlement: hold, verify,
 then release. The payment rail is an interface; Stripe is the first, and x402 or MPP can follow.

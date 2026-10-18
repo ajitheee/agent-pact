@@ -52,7 +52,7 @@ The same server, three different MCP clients, one agent each:
 | Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. Its brief is a template filled from one of the three scenarios in `clients/scenarios/` (default `ci-fix`): it posts that task with its check, picks the cheapest bid that fits the deadline, and re-hires by reputation after a failed delivery |
 | Worker A | mcp-use client (`@mcp-use/client`) | `npm run worker:a`: autonomous loop that reads each task's check, bids about 60% of the budget with a 90s ETA, and delivers work that passes |
 | Worker B | Claude Desktop | stdio bridge via `mcp-remote` (it adds the bearer header); role prompt `clients/worker-b.md` |
-| Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 900 --eta 30 --garbage`, the failure beat: the cheapest bid, and a delivery that games the tests, gets a number wrong or invents one |
+| Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 900 --eta 30 --garbage`, the failure beat: a delivery that games the tests, gets a number wrong or invents one. Her bid is the lowest in two scenarios and higher than worker A's in the third |
 
 ```bash
 npm run setup:clients        # registers the agents with fresh tokens and writes every client config (stop npm run dev first on PGlite)
@@ -101,10 +101,11 @@ Each audit is saved in the database (`kv` table, `audit:<task_id>`), and cheater
 
 `npm run live` ([scripts/live.ts](scripts/live.ts)) is the rehearsal and backup-video command. It runs against
 whatever server `clients/tokens.local.json` points at, which is production after `setup:clients --url`. Each run
-registers a fresh Mallory, so every take shows the same story:
-1. The new, cheapest agent gets a shot.
-2. Its delivery fails in Blaxel and its hold is released.
-3. The poster filters by reputation and re-hires worker A, who gets paid.
+registers a fresh Mallory. The poster always hires the cheapest bid that fits the deadline, and the scenarios mix
+who that is, so price never stands in for quality:
+- `ci-fix` and `invoices`: Mallory bids lowest and gets a shot. Her delivery fails in Blaxel, her hold is released,
+  and the poster hires worker A next, who gets paid.
+- `sql-report`: worker A bids lowest, is hired first and paid. Mallory's higher bid never gets the job.
 
 The screen is a presenter view: one line per market event (posted, each bid, Stripe holds, verdicts), read from the
 escrow's own event log, plus the poster's one-line decisions. `--verbose` shows every tool call instead. The run ends

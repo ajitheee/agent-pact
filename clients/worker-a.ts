@@ -76,7 +76,16 @@ for (;;) {
   }
 
   for (const c of page.closed ?? []) {
-    if (!c.awarded_to_you) continue;
+    if (!c.awarded_to_you) {
+      // A one-job worker whose bid lost stops once the task is settled for good (not merely awarded to someone
+      // else, who may still fail and reopen it).
+      if (opts.once && bidOn.has(c.task_id) && ['completed', 'expired'].includes(c.status)) {
+        log(`${c.task_id} ${c.status} without me: another bid was chosen`);
+        await client.close();
+        process.exit(0);
+      }
+      continue;
+    }
     const task = await call('get_task', { task_id: c.task_id });
     log(`awarded ${c.task_id}; escrow ${task.escrow?.payment_intent} held. Building the deliverable${opts.garbage ? ' (garbage)' : ''}…`);
     // A demo scenario's task gets that scenario's prepared delivery; anything else falls back to contacts.
