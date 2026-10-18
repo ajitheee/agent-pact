@@ -4,47 +4,144 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AgentPact · studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
 <style>
-:root { --bg:#060a13; --panel:#0b1220; --panel2:#0f182b; --line:#1f2d4a; --text:#e8eef9; --soft:#c3cfe3; --muted:#8391ad; --gold:#fbbf24; --teal:#2dd4bf; --violet:#a78bfa; --red:#f87171; --green:#34d399; }
+:root { --bg:#060a13; --panel:#0b1220; --panel2:#0f182b; --line:#1f2d4a; --text:#e8eef9; --soft:#c3cfe3; --muted:#8391ad; --gold:#fbbf24; --teal:#2dd4bf; --violet:#a78bfa; --red:#f87171; --green:#34d399;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif; --mono: "JetBrains Mono", Consolas, monospace; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: #03060c; color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
 body { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; padding: 16px; }
 #frame { display: flex; align-items: center; justify-content: center; min-width: 0; }
 #stage { position: relative; overflow: hidden; background: var(--bg); }
-#canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; font-family: "Segoe UI", system-ui, sans-serif; }
+#canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; }
+#dust { position: absolute; inset: 0; }
 .scene { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
 .scene.on { opacity: 1; }
+.abs { position: absolute; }
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.spot { position: absolute; inset: 0; }
 .reveal { opacity: 0; transform: translateY(28px); transition: opacity .6s ease, transform .6s ease; }
 .reveal.show { opacity: 1; transform: none; }
-.eyebrow { font: 600 26px/1.3 Consolas, "Courier New", monospace; letter-spacing: 3px; text-transform: uppercase; }
-h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -1px; }
+.eyebrow { font: 600 26px/1.3 var(--mono); letter-spacing: 3px; text-transform: uppercase; }
+h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: -1px; }
 p { margin: 0; }
-/* face */
-#cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #0b1220; }
-#camFallback { position: absolute; inset: 0; background: radial-gradient(circle at 70% 45%, #2b2109 0%, #0b101d 45%, #060a13 100%); display: none; }
-.shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6,10,19,.55) 0%, rgba(6,10,19,0) 30%, rgba(6,10,19,0) 55%, rgba(6,10,19,.85) 100%); }
-.brand { position: absolute; left: 72px; top: 60px; display: flex; align-items: center; gap: 18px; font-size: 34px; font-weight: 700; }
-.brand small { font-size: 24px; font-weight: 500; color: var(--soft); }
-.lower { position: absolute; left: 72px; bottom: 80px; display: flex; flex-direction: column; gap: 6px; padding: 22px 34px; background: rgba(11,18,32,.82); border-left: 6px solid var(--gold); }
-.lower b { font-size: 46px; } .lower span { font-size: 28px; color: var(--soft); }
-#outro { position: absolute; left: 72px; right: 72px; bottom: 80px; display: none; flex-direction: column; gap: 22px; }
-#outro h2 { font-size: 76px; line-height: 1.08; max-width: 1500px; }
+.w, .l { display: inline-block; }
+.gold { color: var(--gold); }
 .pill { align-self: flex-start; font-size: 30px; padding: 12px 28px; border: 2px solid var(--teal); border-radius: 999px; background: rgba(11,18,32,.85); }
-/* slides */
+.chip:not(.abs) { position: relative; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 999px; font: 700 24px/1.2 var(--mono); border: 2px solid; background: rgba(6,10,19,.88); white-space: nowrap; }
+.chip.gold { color: var(--gold); border-color: rgba(251,191,36,.75); box-shadow: 0 0 26px rgba(251,191,36,.35); }
+.chip.green { color: var(--green); border-color: rgba(52,211,153,.75); box-shadow: 0 0 26px rgba(52,211,153,.3); }
+.chip.red { color: #fca5a5; border-color: rgba(248,113,113,.8); box-shadow: 0 0 26px rgba(248,113,113,.3); }
+.strike { position: absolute; left: -8px; right: -8px; top: 50%; height: 4px; margin-top: -2px; background: var(--red); box-shadow: 0 0 12px var(--red); transform-origin: left; }
+.coin { position: absolute; left: 0; top: 0; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 700 20px var(--display); color: #3a2a05; background: radial-gradient(circle at 35% 30%, #fde68a, #fbbf24 55%, #b7791f); box-shadow: 0 0 20px rgba(251,191,36,.85); opacity: 0; }
+.ring { position: absolute; border: 4px solid var(--gold); border-radius: 50%; opacity: 0; }
+.float { position: absolute; font: 700 36px var(--display); text-shadow: 0 0 18px currentColor; opacity: 0; white-space: nowrap; }
+.stamp { position: absolute; left: 50%; padding: 10px 30px; border: 5px solid; border-radius: 14px; font: 700 46px var(--display); letter-spacing: 1px; white-space: nowrap; transform: translateX(-50%) rotate(-7deg); background: rgba(6,10,19,.85); }
+.stamp.red { color: #fca5a5; border-color: var(--red); box-shadow: 0 0 44px rgba(248,113,113,.45); }
+
+/* agents and the vault */
+.agent { width: 180px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.agent .orb { width: 180px; height: 180px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 38%, #142441, #0b1220 70%); border: 3px solid var(--teal); box-shadow: 0 0 46px rgba(45,212,191,.35), inset 0 0 30px rgba(45,212,191,.16); }
+.agent b { font: 700 32px var(--display); white-space: nowrap; }
+.agent span { font-size: 24px; color: var(--soft); white-space: nowrap; }
+.agent.sm { width: 150px; } .agent.sm .orb { width: 150px; height: 150px; }
+.vault { width: 230px; height: 260px; filter: drop-shadow(0 0 34px rgba(251,191,36,.5)); }
+.vault svg { position: absolute; inset: 0; }
+.vaultTxt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.vaultTxt small { font: 700 19px var(--mono); letter-spacing: 4px; color: var(--gold); }
+.vaultTxt b { font: 700 46px var(--display); }
+.swap { position: relative; display: grid; } .swap > * { grid-area: 1 / 1; text-align: center; }
+#fVFull { opacity: 0; }
+.link { stroke: #2a3d63; stroke-width: 4; stroke-dasharray: 10 12; animation: flow 1.2s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -44; } }
+@keyframes breathe { 50% { opacity: .45; } }
+
+/* intro */
+.kin { font-size: 70px; line-height: 1.1; white-space: nowrap; opacity: 0; }
+.kin.red { color: #fca5a5; }
+.title { font-size: 156px; line-height: 1; letter-spacing: -4px; white-space: nowrap; }
+.tagline { font: 500 46px var(--display); color: var(--soft); margin-top: 22px; }
+.noCheck { left: 485px; top: 612px; width: 220px; height: 96px; border: 3px dashed var(--red); border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fca5a5; background: rgba(60,12,14,.6); font: 700 30px var(--display); opacity: 0; }
+.noCheck small { font: 500 19px var(--mono); letter-spacing: 1px; opacity: .85; }
+.doc { left: 0; top: 0; width: 76px; height: 96px; border-radius: 10px; background: #e8eef9; padding: 18px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 0 32px rgba(232,238,249,.4); opacity: 0; }
+.doc i { display: block; height: 7px; border-radius: 4px; background: #9aa8c2; } .doc i:nth-child(2) { width: 70%; }
+.doc em { position: absolute; right: -18px; top: -18px; width: 42px; height: 42px; border-radius: 50%; background: var(--red); color: #fff; font: 700 26px var(--display); font-style: normal; display: flex; align-items: center; justify-content: center; }
+
+/* problem */
+.vg { position: absolute; top: 280px; width: 540px; height: 640px; padding: 34px; border-radius: 28px; background: linear-gradient(180deg, rgba(17,27,48,.94), rgba(9,15,28,.94)); border: 1px solid #22345a; box-shadow: 0 30px 80px rgba(0,0,0,.45); display: flex; flex-direction: column; gap: 18px; }
+.vg .eyebrow { font-size: 21px; color: var(--teal); }
+.vg h3 { font-size: 44px; line-height: 1.08; margin-top: 4px; }
+.ci, .sql, .ledger { background: #070c17; border: 1px solid #1c2a47; border-radius: 18px; }
+.ci { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; font: 500 23px var(--mono); }
+.ciHead { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 20px; margin-bottom: 4px; }
+.ciRow { display: flex; gap: 14px; align-items: center; color: var(--soft); }
+.ciRow i { font-style: normal; color: var(--green); font-weight: 700; }
+.badge { font: 700 20px var(--mono); padding: 4px 12px; border-radius: 8px; color: #062b1c; background: var(--green); box-shadow: 0 0 22px rgba(52,211,153,.6); }
+.prod { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-radius: 16px; background: #0d1527; border: 2px solid #22345a; font: 500 23px var(--mono); }
+.prod b { font: 700 32px var(--display); }
+.tag { font: 700 17px var(--mono); letter-spacing: 2px; color: var(--muted); }
+.sqlWrap { position: relative; }
+.sql { margin: 0; padding: 16px 20px; font: 500 22px/1.55 var(--mono); color: var(--soft); }
+.sql span { display: block; white-space: pre; }
+.sql em { font-style: normal; color: var(--violet); }
+.chart { position: relative; height: 200px; display: flex; align-items: flex-end; gap: 34px; padding-left: 12px; }
+.col { width: 110px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.col b { font: 700 30px var(--display); }
+.col small { font: 500 19px var(--mono); color: var(--muted); white-space: nowrap; }
+.bar { display: block; width: 110px; border-radius: 12px 12px 0 0; transform-origin: bottom; }
+.bar.rep { height: 120px; background: linear-gradient(180deg, #fbbf24, #b7791f); box-shadow: 0 0 30px rgba(251,191,36,.35); }
+.bar.act { height: 86px; background: rgba(45,212,191,.12); border: 3px dashed var(--teal); border-bottom: 0; }
+#c2Why { right: 0; top: 46px; white-space: normal; border-radius: 16px; font-size: 20px; line-height: 1.25; }
+.paper { background: #f3efe6; color: #1d2433; border-radius: 14px; padding: 16px 22px; font: 500 20px/1.55 var(--mono); box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+.paper .co { font: 700 25px var(--display); color: #111827; }
+.paper .no { font-size: 16px; color: #6b7280; margin-bottom: 6px; }
+.paper .row { display: flex; justify-content: space-between; }
+.ledger { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; font: 500 23px var(--mono); }
+.ledger b { font: 700 30px var(--mono); color: #fca5a5; }
+.hlBox { position: relative; }
+.hl { position: absolute; inset: -5px -10px; border: 3px solid; border-radius: 10px; }
+.hl.teal { border-color: #0d9488; box-shadow: 0 0 18px rgba(13,148,136,.5); }
+.hl.red { border-color: var(--red); box-shadow: 0 0 22px rgba(248,113,113,.6); }
+.gate { position: absolute; left: 790px; top: 740px; width: 340px; height: 72px; border-radius: 999px; border: 2px solid #2a3d63; background: rgba(7,12,23,.94); overflow: hidden; display: flex; align-items: center; justify-content: center; font: 700 26px var(--mono); }
+.gate .scan { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(56,189,248,.04), rgba(56,189,248,.32)); transform-origin: left; }
+.gate span { position: absolute; }
+#fChecking { color: #7dd3fc; opacity: 0; }
+#fPass { color: var(--green); font-size: 30px; }
+.flowText { position: absolute; left: 0; right: 0; top: 862px; text-align: center; font: 700 46px var(--display); color: var(--gold); }
+
+/* outro */
+#oHex { position: absolute; left: 80px; top: 110px; width: 820px; height: 900px; }
+#oHex .glow { animation: breathe 5s ease-in-out infinite; }
+#oHead { left: 100px; top: 250px; width: 1060px; font-size: 92px; line-height: 1.05; }
+#oLogo { left: 100px; top: 640px; display: flex; align-items: center; gap: 22px; }
+#oLogo b { font: 700 76px var(--display); letter-spacing: -2px; }
+#oLogo .logoTag { font: 500 32px var(--display); color: var(--soft); }
+
+/* camera */
+#camBox { position: absolute; left: 1150px; top: 130px; width: 660px; height: 820px; border-radius: 40px; overflow: hidden; background: #0b1220; border: 2px solid rgba(251,191,36,.5); box-shadow: 0 0 0 1px rgba(251,191,36,.12), 0 30px 120px rgba(251,191,36,.18), 0 24px 60px rgba(0,0,0,.6); opacity: 0; transform: scale(.96); transition: opacity .7s ease, transform .9s cubic-bezier(.2,.8,.2,1), left .9s cubic-bezier(.2,.8,.2,1), top .9s cubic-bezier(.2,.8,.2,1), width .9s cubic-bezier(.2,.8,.2,1), height .9s cubic-bezier(.2,.8,.2,1); }
+#camBox.on { opacity: 1; transform: none; }
+#camBox.outro { left: 1230px; top: 170px; width: 580px; height: 740px; }
+#cam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+#camFallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 38%, #2b2109 0%, #0b101d 55%, #060a13 100%); }
+#camFallback span { width: 230px; height: 230px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 700 116px var(--display); color: var(--gold); border: 3px solid rgba(251,191,36,.6); background: rgba(11,18,32,.8); }
+#nameTag { position: absolute; left: 28px; right: 28px; bottom: 28px; padding: 18px 26px; border-radius: 22px; background: rgba(6,10,19,.8); border-left: 6px solid var(--gold); display: flex; flex-direction: column; gap: 2px; }
+#nameTag b { font: 700 44px var(--display); } #nameTag span { font-size: 26px; color: var(--soft); }
+
+/* slides, dashboard, caption */
 .slide { position: absolute; inset: 0; padding: 120px 128px; display: flex; flex-direction: column; gap: 52px; background: var(--bg); }
 .slide h2 { font-size: 76px; line-height: 1.08; }
-.cards { display: flex; gap: 32px; }
-.card { flex: 1; display: flex; flex-direction: column; gap: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 46px; }
-.card h3 { font-size: 46px; line-height: 1.12; } .card p { font-size: 32px; line-height: 1.4; color: var(--soft); }
 .steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 22px; }
 .step { display: flex; flex-direction: column; gap: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 18px; padding: 30px; }
 .step h3 { font-size: 42px; } .step p { font-size: 25px; line-height: 1.4; color: var(--soft); }
 .num { color: var(--gold); }
-/* dashboard */
 #zoom { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; transition: transform 1.3s cubic-bezier(.65, 0, .35, 1); }
 #dash iframe { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; border: 0; transform: scale(1.2); transform-origin: 0 0; background: var(--bg); }
 #caption { position: absolute; left: 50%; bottom: 56px; transform: translate(-50%, 12px); opacity: 0; transition: opacity .45s ease, transform .45s ease; padding: 18px 40px; border-radius: 16px; background: rgba(6,10,19,.92); border: 2px solid var(--gold); font-size: 40px; font-weight: 700; white-space: nowrap; }
 #caption.show { opacity: 1; transform: translate(-50%, 0); }
+
 /* teleprompter (not recorded) */
 #prompter { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
 .panel { background: #0b1220; border: 1px solid #1a2640; border-radius: 12px; padding: 14px 16px; }
@@ -55,8 +152,8 @@ button:disabled { opacity: .45; cursor: default; }
 input { font: inherit; color: var(--text); background: #060a13; border: 1px solid #2a3c62; border-radius: 8px; padding: 7px 10px; width: 100%; }
 #now { font-size: 25px; line-height: 1.45; min-height: 220px; }
 #next { color: var(--muted); font-size: 16px; min-height: 60px; }
-.bar { height: 8px; border-radius: 4px; background: #16223a; overflow: hidden; }
-.bar div { height: 100%; width: 0; background: var(--gold); }
+.bar2 { height: 8px; border-radius: 4px; background: #16223a; overflow: hidden; }
+.bar2 div { height: 100%; width: 0; background: var(--gold); }
 #count { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 120px; font-weight: 800; color: var(--gold); background: rgba(3,6,12,.75); }
 #status { color: var(--muted); font-size: 13px; }
 #status.warn { color: var(--gold); }
@@ -64,26 +161,83 @@ input { font: inherit; color: var(--text); background: #060a13; border: 1px soli
 </head>
 <body>
 <div id="frame"><div id="stage"><div id="canvas">
+  <canvas id="dust" width="1920" height="1080"></canvas>
 
-  <div class="scene" id="face">
-    <video id="cam" autoplay muted playsinline></video>
-    <div id="camFallback"></div>
-    <div class="shade"></div>
-    <div class="brand"><svg width="44" height="50" viewBox="0 0 44 50" aria-hidden="true"><polygon points="22,2 42,13.5 42,36.5 22,48 2,36.5 2,13.5" fill="#0b1220" stroke="#fbbf24" stroke-width="3"/><circle cx="22" cy="25" r="5" fill="#fbbf24"/></svg>AgentPact<small>escrow for agent work</small></div>
-    <div class="lower" id="lower"><b id="lowerName">Ajith</b><span>Building AgentPact · escrow for agent work</span></div>
-    <div id="outro"><h2>Verification is the missing layer of agent payments.</h2><p class="pill">github.com/ajitheee/agent-pact</p></div>
-  </div>
-
-  <div class="scene" id="problem"><div class="slide">
-    <h2>Agents can pay. Nobody checks the work.</h2>
-    <div class="cards">
-      <div class="card reveal" id="p1"><p class="eyebrow" style="color:var(--teal)">Coding agent</p><h3>Games the tests</h3><p>CI goes green. The bug ships.</p></div>
-      <div class="card reveal" id="p2"><p class="eyebrow" style="color:var(--teal)">Data agent</p><h3>Runs fine, wrong number</h3><p>The board deck gets a JOIN fan-out.</p></div>
-      <div class="card reveal" id="p3"><p class="eyebrow" style="color:var(--teal)">Back-office agent</p><h3>Invents a figure</h3><p>A VAT amount that was never on the invoice.</p></div>
+  <!-- 0:00 intro: agents pay each other, nobody checks, the vault slams in -->
+  <div class="scene" id="intro"><div class="layer" id="iWrap">
+    <div class="spot" style="background:radial-gradient(900px 700px at 30% 62%, rgba(45,212,191,.09), transparent 70%), radial-gradient(800px 700px at 84% 45%, rgba(251,191,36,.10), transparent 70%)"></div>
+    <h1 class="kin abs split" id="iHead1" style="left:100px;top:150px">Agents can pay each other.</h1>
+    <h1 class="kin red abs split" id="iHead2" style="left:100px;top:246px">Nobody checks the work.</h1>
+    <div class="abs" id="iTitle" style="left:100px;top:118px">
+      <h1 class="title" id="iTitleText"><span class="letters">Agent</span><span class="letters gold">Pact</span></h1>
+      <p class="tagline" id="iTag">Escrow for agent work</p>
     </div>
-    <div style="flex:1"></div>
-    <p class="reveal" id="p4" style="font-size:46px;font-weight:700;color:var(--gold)">So the money waits in escrow, and moves only when a machine check passes.</p>
+    <svg class="abs" style="left:0;top:0" width="1100" height="1080" aria-hidden="true"><line id="iLink" class="link" x1="350" y1="660" x2="840" y2="660"/></svg>
+    <div class="agent abs" id="iA" style="left:170px;top:570px"><div class="orb"><svg width="92" height="92" viewBox="0 0 64 64" aria-hidden="true"><line x1="32" y1="6" x2="32" y2="14" stroke="#2dd4bf" stroke-width="3"/><circle cx="32" cy="5" r="3.5" fill="#2dd4bf"/><rect x="10" y="14" width="44" height="36" rx="11" fill="none" stroke="#2dd4bf" stroke-width="3.5"/><circle cx="24" cy="31" r="4.5" fill="#2dd4bf"/><circle cx="40" cy="31" r="4.5" fill="#2dd4bf"/><line x1="24" y1="42" x2="40" y2="42" stroke="#2dd4bf" stroke-width="3" stroke-linecap="round"/></svg></div><b>Agent A</b><span>hires and pays</span></div>
+    <div class="agent abs" id="iB" style="left:840px;top:570px"><div class="orb"><svg width="92" height="92" viewBox="0 0 64 64" aria-hidden="true"><line x1="32" y1="6" x2="32" y2="14" stroke="#2dd4bf" stroke-width="3"/><circle cx="32" cy="5" r="3.5" fill="#2dd4bf"/><rect x="10" y="14" width="44" height="36" rx="11" fill="none" stroke="#2dd4bf" stroke-width="3.5"/><circle cx="24" cy="31" r="4.5" fill="#2dd4bf"/><circle cx="40" cy="31" r="4.5" fill="#2dd4bf"/><line x1="24" y1="42" x2="40" y2="42" stroke="#2dd4bf" stroke-width="3" stroke-linecap="round"/></svg></div><b>Agent B</b><span>does the work</span></div>
+    <div class="noCheck abs" id="iNo">no check<small>work unverified</small></div>
+    <div class="doc abs" id="iDoc"><i></i><i></i><i></i><em>?</em></div>
+    <div class="vault abs" id="iVault" style="left:480px;top:530px"><svg viewBox="0 0 230 260" aria-hidden="true"><polygon points="115,8 221,69 221,191 115,252 9,191 9,69" fill="#0b1220" stroke="#fbbf24" stroke-width="5"/><polygon points="115,30 202,80 202,180 115,230 28,180 28,80" fill="none" stroke="#5a4512" stroke-width="2"/></svg><div class="vaultTxt"><small>ESCROW</small><b>$40.00</b></div></div>
+    <span class="chip gold abs" id="iHeld" style="left:518px;top:470px">HELD $40</span>
+    <div class="layer" id="iFx"></div>
   </div></div>
+
+  <!-- 0:10 the problem: three agents whose work looks done, then the escrow that fixes it -->
+  <div class="scene" id="problem">
+    <div class="spot" style="background:radial-gradient(1200px 600px at 50% 0%, rgba(167,139,250,.08), transparent 70%), radial-gradient(1000px 500px at 50% 100%, rgba(248,113,113,.07), transparent 70%)"></div>
+    <p class="eyebrow abs" id="pEye" style="left:100px;top:96px;color:var(--red)">The problem</p>
+    <h2 class="abs split" id="pHead" style="left:100px;top:136px;font-size:84px;line-height:1.05">The work looks done. It isn't.</h2>
+
+    <div class="vg" id="v1" style="left:100px">
+      <div><p class="eyebrow">Coding agent</p><h3>Games the tests</h3></div>
+      <div class="ci">
+        <div class="ciHead"><span>CI · pricing.py</span><span class="badge" id="c1Pass">PASSED</span></div>
+        <div class="ciRow" id="c1r0"><i>✓</i>test_percent_discount</div>
+        <div class="ciRow" id="c1r1"><i>✓</i>test_flat_discount</div>
+        <div class="ciRow" id="c1r2"><i>✓</i>test_tax_after_discount</div>
+        <div class="ciRow" id="c1r3"><i>✓</i>test_round_half_up</div>
+        <div class="ciRow" id="c1r4"><i>✓</i>test_unknown_region</div>
+      </div>
+      <div class="prod" id="c1Prod"><span class="tag">PRODUCTION</span><span>real cart</span><b id="c1Total">$107.99</b></div>
+      <div><span class="chip gold" id="c1Paid">PAID $40<i class="strike" id="c1Strike"></i></span></div>
+      <div class="stamp red" id="c1Stamp" style="top:250px">BUG SHIPPED</div>
+    </div>
+
+    <div class="vg" id="v2" style="left:690px">
+      <div><p class="eyebrow">Data agent</p><h3>Runs fine, wrong number</h3></div>
+      <div class="sqlWrap"><pre class="sql"><span id="c2l0"><em>SELECT</em> SUM(o.amount)</span><span id="c2l1"><em>FROM</em> orders o</span><span id="c2l2"><em>JOIN</em> items i USING (order_id)</span></pre><span class="chip green abs" id="c2Ran" style="right:14px;top:14px">✓ 41 ms</span></div>
+      <div class="chart">
+        <div class="col"><b id="c2RepV">$2.41M</b><i class="bar rep" id="c2Rep"></i><small>board deck</small></div>
+        <div class="col"><b id="c2ActV">$1.73M</b><i class="bar act" id="c2Act"></i><small>actual</small></div>
+        <span class="chip red abs" id="c2Why">orders counted<br>once per item</span>
+      </div>
+      <div class="stamp red" id="c2Stamp" style="top:215px">WRONG NUMBER</div>
+    </div>
+
+    <div class="vg" id="v3" style="left:1280px">
+      <div><p class="eyebrow">Back-office agent</p><h3>Invents a figure</h3></div>
+      <div class="paper" id="c3Paper">
+        <div class="co">Kranich Druck GmbH</div><div class="no">RECHNUNG KD-2026-0917</div>
+        <div class="row"><span>Nettobetrag</span><span>1.249,90 €</span></div>
+        <div class="row"><span>zzgl. 19 % MwSt.</span><span class="hlBox">237,48 €<i class="hl teal" id="c3HlDoc"></i></span></div>
+        <div class="row"><span>Gesamtbetrag</span><span>1.487,38 €</span></div>
+      </div>
+      <div class="ledger" id="c3Ledger"><span class="tag">LEDGER · TAX</span><b class="hlBox">237.50<i class="hl red" id="c3HlLed"></i></b></div>
+      <div><span class="chip red" id="c3Why">never on the invoice</span></div>
+      <div class="stamp red" id="c3Stamp" style="top:520px">INVENTED</div>
+    </div>
+
+    <div class="layer" id="pFlow">
+      <div class="agent sm abs" id="fP" style="left:485px;top:485px"><div class="orb"><svg width="78" height="78" viewBox="0 0 64 64" aria-hidden="true"><line x1="32" y1="6" x2="32" y2="14" stroke="#a78bfa" stroke-width="3"/><circle cx="32" cy="5" r="3.5" fill="#a78bfa"/><rect x="10" y="14" width="44" height="36" rx="11" fill="none" stroke="#a78bfa" stroke-width="3.5"/><circle cx="24" cy="31" r="4.5" fill="#a78bfa"/><circle cx="40" cy="31" r="4.5" fill="#a78bfa"/><line x1="24" y1="42" x2="40" y2="42" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/></svg></div><b>Poster</b><span>pays for checked work</span></div>
+      <div class="vault abs" id="fV" style="left:845px;top:430px"><svg viewBox="0 0 230 260" aria-hidden="true"><polygon points="115,8 221,69 221,191 115,252 9,191 9,69" fill="#0b1220" stroke="#fbbf24" stroke-width="5"/><polygon points="115,30 202,80 202,180 115,230 28,180 28,80" fill="none" stroke="#5a4512" stroke-width="2"/></svg><div class="vaultTxt"><small>ESCROW</small><span class="swap"><b id="fVFull">$40.00</b><b id="fVEmpty">$0.00</b></span></div></div>
+      <div class="agent sm abs" id="fW" style="left:1285px;top:485px"><div class="orb"><svg width="78" height="78" viewBox="0 0 64 64" aria-hidden="true"><line x1="32" y1="6" x2="32" y2="14" stroke="#2dd4bf" stroke-width="3"/><circle cx="32" cy="5" r="3.5" fill="#2dd4bf"/><rect x="10" y="14" width="44" height="36" rx="11" fill="none" stroke="#2dd4bf" stroke-width="3.5"/><circle cx="24" cy="31" r="4.5" fill="#2dd4bf"/><circle cx="40" cy="31" r="4.5" fill="#2dd4bf"/><line x1="24" y1="42" x2="40" y2="42" stroke="#2dd4bf" stroke-width="3" stroke-linecap="round"/></svg></div><b>Worker</b><span>paid on a pass</span></div>
+      <span class="chip gold abs" id="fHeld" style="left:883px;top:372px">HELD $40</span>
+      <div class="gate" id="fGate"><i class="scan" id="fScan"></i><span id="fChecking">machine check…</span><span id="fPass">✓ PASS</span></div>
+      <span class="chip green abs" id="fPaid" style="left:1283px;top:425px">PAID $40</span>
+      <p class="flowText split" id="fText">The money waits in escrow. It moves only when a machine check passes.</p>
+      <div class="layer" id="fFx"></div>
+    </div>
+  </div>
 
   <div class="scene" id="dash"><div id="zoom"><iframe id="dashFrame" src="/?studio=1" title="Live dashboard"></iframe></div></div>
 
@@ -104,6 +258,18 @@ input { font: inherit; color: var(--text); background: #060a13; border: 1px soli
     </div>
   </div></div>
 
+  <!-- 1:50 outro -->
+  <div class="scene" id="outro">
+    <div class="spot" style="background:radial-gradient(1000px 800px at 28% 50%, rgba(251,191,36,.11), transparent 70%)"></div>
+    <svg id="oHex" viewBox="0 0 230 260" aria-hidden="true"><polygon class="glow" points="115,8 221,69 221,191 115,252 9,191 9,69" fill="none" stroke="#fbbf24" stroke-width="2.5" opacity=".9"/><polygon points="115,30 202,80 202,180 115,230 28,180 28,80" fill="none" stroke="#5a4512" stroke-width="1.2"/></svg>
+    <p class="eyebrow abs" id="oEye" style="left:100px;top:190px;color:var(--gold)">Why it matters</p>
+    <h2 class="abs split" id="oHead">Verification is the missing layer of agent payments.</h2>
+    <div class="abs" id="oLogo"><svg width="72" height="82" viewBox="0 0 44 50" aria-hidden="true"><polygon points="22,2 42,13.5 42,36.5 22,48 2,36.5 2,13.5" fill="#0b1220" stroke="#fbbf24" stroke-width="3"/><circle cx="22" cy="25" r="5" fill="#fbbf24"/></svg><b>Agent<span class="gold">Pact</span></b><span class="logoTag">escrow for agent work</span></div>
+    <p class="pill abs" id="oGit" style="left:100px;top:780px">github.com/ajitheee/agent-pact</p>
+    <p class="abs" id="oBuilt" style="left:100px;top:880px;font-size:26px;color:var(--muted)">Built with Manufact (mcp-use) · Stripe · Blaxel · Primitive</p>
+  </div>
+
+  <div id="camBox" class="on"><video id="cam" autoplay muted playsinline></video><div id="camFallback"><span id="camInitial">A</span></div><div id="nameTag"><b id="lowerName">Ajith</b><span>Building AgentPact</span></div></div>
   <div id="caption"></div>
 </div></div></div>
 
@@ -116,11 +282,11 @@ input { font: inherit; color: var(--text); background: #060a13; border: 1px soli
   </div>
   <div class="panel" style="flex:1;display:flex;flex-direction:column;gap:12px;position:relative">
     <h4><span id="clock">0:00 / 2:00</span> · read this</h4>
-    <div class="bar"><div id="lineBar"></div></div>
+    <div class="bar2"><div id="lineBar"></div></div>
     <div id="now">Press Rehearse to practice, or Record when ready. The screen follows the script on its own: read the highlighted line, and if you finish early, just pause.</div>
     <h4>Next</h4>
     <div id="next"></div>
-    <div class="bar"><div id="totalBar" style="background:var(--teal)"></div></div>
+    <div class="bar2"><div id="totalBar" style="background:var(--teal)"></div></div>
     <div id="count"></div>
   </div>
   <div class="panel" id="done" style="display:none"><h4>Your video</h4><a id="download" style="color:var(--teal)">Download agentpact-demo.webm</a></div>
@@ -152,16 +318,179 @@ function fit() {
 }
 addEventListener('resize', fit); fit();
 
+// Words and letters animate one by one.
+document.querySelectorAll('.split').forEach((n) => {
+  const words = n.textContent.trim().split(/\s+/);
+  n.textContent = '';
+  words.forEach((w, i) => { const s = document.createElement('span'); s.className = 'w'; s.textContent = w; n.append(s); if (i < words.length - 1) n.append(' '); });
+});
+document.querySelectorAll('.letters').forEach((n) => {
+  const chars = [...n.textContent];
+  n.textContent = '';
+  chars.forEach((c) => { const s = document.createElement('span'); s.className = 'l'; s.textContent = c; n.append(s); });
+});
+
+// Ambient dust: slow gold and teal motes behind every scene.
+(() => {
+  const g = $('dust').getContext('2d');
+  const motes = Array.from({ length: 70 }, () => ({ x: Math.random() * 1920, y: Math.random() * 1080, r: 0.6 + Math.random() * 2.2, vx: (Math.random() - 0.5) * 0.18, vy: -0.08 - Math.random() * 0.28, a: 0.12 + Math.random() * 0.45, gold: Math.random() < 0.55 }));
+  (function frame() {
+    g.clearRect(0, 0, 1920, 1080);
+    for (const m of motes) {
+      m.x += m.vx; m.y += m.vy;
+      if (m.y < -10) { m.y = 1090; m.x = Math.random() * 1920; }
+      g.beginPath(); g.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+      g.fillStyle = m.gold ? `rgba(251,191,36,${m.a})` : `rgba(45,212,191,${m.a * 0.8})`;
+      g.fill();
+    }
+    requestAnimationFrame(frame);
+  })();
+})();
+
+// ── motion: Web Animations scheduled from each scene's start, all cancelled on reset ──
+// Elements that stay on screen are visible in CSS and animate in with fill 'both'; elements that come and go are
+// hidden in CSS. A later change to an element uses fill 'forwards', so it only takes over once it starts.
+const EASE = 'cubic-bezier(.2,.8,.2,1)', POP = 'cubic-bezier(.34,1.56,.64,1)', INOUT = 'cubic-bezier(.65,0,.35,1)';
+const motions = [];
+const node = (t) => (typeof t === 'string' ? $(t) : t);
+/** Animate `t`, starting `at` seconds after the scene starts, for `dur` seconds. */
+function mo(t, frames, { at = 0, dur = 0.6, ease = EASE, fill = 'both', iter = 1 } = {}) {
+  const a = node(t).animate(frames, { delay: at * 1000, duration: dur * 1000, easing: ease, fill, iterations: iter });
+  motions.push(a);
+  return a;
+}
+function stopMotion() { motions.splice(0).forEach((a) => a.cancel()); document.querySelectorAll('.spawn').forEach((n) => n.remove()); }
+const fadeUp = (t, at, dur = 0.6, dy = 34) => mo(t, [{ opacity: 0, transform: `translateY(${dy}px)` }, { opacity: 1, transform: 'none' }], { at, dur });
+const pop = (t, at, dur = 0.55) => mo(t, [{ opacity: 0, transform: 'scale(.55)' }, { opacity: 1, transform: 'scale(1)' }], { at, dur, ease: POP });
+const showIn = (t, at, dur = 0.4) => mo(t, [{ opacity: 0 }, { opacity: 1 }], { at, dur });
+const grow = (t, at, dur) => mo(t, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { at, dur });
+const stamp = (t, at) => mo(t, [{ opacity: 0, transform: 'translateX(-50%) rotate(-7deg) scale(2.3)' }, { opacity: 1, transform: 'translateX(-50%) rotate(-7deg) scale(1)' }], { at, dur: 0.45, ease: POP });
+const shake = (t, at, px = 10) => mo(t, [0, -1, 0.9, -0.7, 0.6, -0.3, 0].map((k) => ({ transform: `translateX(${k * px}px)` })), { at, dur: 0.45, ease: 'linear', fill: 'none' });
+const slam = (t, at) => mo(t, [{ opacity: 0, transform: 'scale(1.9)', filter: 'blur(10px)' }, { opacity: 1, transform: 'scale(.93)', filter: 'blur(0px)', offset: 0.7 }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0px)' }], { at, dur: 0.6, ease: 'ease-in' });
+const type = (t, at, dur) => mo(t, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { at, dur, ease: `steps(${node(t).textContent.length})` });
+/** Visible only between `from` and `to`. */
+function between(t, from, to, fin = 0.3, fout = 0.4) {
+  const d = to - from;
+  mo(t, [{ opacity: 0, offset: 0 }, { opacity: 1, offset: fin / d }, { opacity: 1, offset: 1 - fout / d }, { opacity: 0, offset: 1 }], { at: from, dur: d, ease: 'linear' });
+}
+function words(t, at, gap = 0.08) {
+  node(t).querySelectorAll('.w').forEach((w, i) => mo(w, [{ opacity: 0, transform: 'translateY(.35em)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { at: at + i * gap, dur: 0.55 }));
+}
+function letters(t, at, gap = 0.05) {
+  node(t).querySelectorAll('.l').forEach((l, i) => mo(l, [{ opacity: 0, transform: 'translateY(.45em) scale(.9)', filter: 'blur(12px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { at: at + i * gap, dur: 0.6 }));
+}
+/** Move `t` (centred on the path) along a curve from a to b; it fades in, and out at the end unless `keep`. */
+function travel(t, a, b, { at, dur = 0.9, bend = -120, w = 0, h = 0, keep = false } = {}) {
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 + bend, n = 14;
+  const frames = Array.from({ length: n + 1 }, (_, k) => {
+    const s = k / n, u = 1 - s, x = u * u * a.x + 2 * u * s * mx + s * s * b.x, y = u * u * a.y + 2 * u * s * my + s * s * b.y;
+    return { transform: `translate(${x - w / 2}px, ${y - h / 2}px) scale(${0.75 + 0.35 * Math.sin(Math.PI * s)})`, opacity: k === 0 || (!keep && k === n) ? 0 : 1 };
+  });
+  return mo(t, frames, { at, dur, ease: INOUT });
+}
+function spawn(layer, cls, text) { const n = document.createElement('div'); n.className = cls + ' spawn'; if (text) n.textContent = text; node(layer).append(n); return n; }
+function coins(layer, a, b, { at, n = 8, gap = 0.12, dur = 0.85, bend = -110 } = {}) {
+  for (let i = 0; i < n; i++) {
+    const c = spawn(layer, 'coin', '$');
+    travel(c, a, b, { at: at + i * gap, dur, bend: bend * (0.75 + Math.random() * 0.5), w: 34, h: 34 }).onfinish = () => c.remove();
+  }
+}
+function ring(layer, p, at, color = '#fbbf24', size = 280) {
+  const r = spawn(layer, 'ring');
+  Object.assign(r.style, { left: p.x - size / 2 + 'px', top: p.y - size / 2 + 'px', width: size + 'px', height: size + 'px', borderColor: color });
+  mo(r, [{ opacity: 0.95, transform: 'scale(.35)' }, { opacity: 0, transform: 'scale(1.7)' }], { at, dur: 0.9, ease: 'cubic-bezier(.1,.7,.3,1)', fill: 'none' }).onfinish = () => r.remove();
+}
+function floatText(layer, text, p, at, color = '#fbbf24') {
+  const f = spawn(layer, 'float', text);
+  Object.assign(f.style, { left: p.x + 'px', top: p.y + 'px', color });
+  mo(f, [{ opacity: 0, transform: 'translate(-50%, 10px)' }, { opacity: 1, transform: 'translate(-50%, -20px)', offset: 0.25 }, { opacity: 1, transform: 'translate(-50%, -50px)', offset: 0.75 }, { opacity: 0, transform: 'translate(-50%, -70px)' }], { at, dur: 1.8, ease: 'linear' }).onfinish = () => f.remove();
+}
+const glow = (t, at, color, iter = 2) => mo(t, [{ boxShadow: `0 0 0 0 ${color}00` }, { boxShadow: `0 0 46px 8px ${color}99` }, { boxShadow: `0 0 0 0 ${color}00` }], { at, dur: 0.75, iter, ease: 'ease-in-out', fill: 'none' });
+
+// 0:00 "Hi, I'm … Agents can already pay each other, but nobody checks the work before the money moves. So I built AgentPact."
+function playIntro() {
+  const aEdge = { x: 350, y: 660 }, bEdge = { x: 840, y: 660 }, vault = { x: 595, y: 660 };
+  mo('nameTag', [{ opacity: 0, transform: 'translateY(26px)' }, { opacity: 1, transform: 'none' }], { at: 0.6, dur: 0.7 });
+  between('iHead1', 1.25, 7.6); words('iHead1', 1.3);
+  pop('iA', 1.5); pop('iB', 1.75); showIn('iLink', 1.9, 0.6);
+  coins('iFx', aEdge, bEdge, { at: 2.3, n: 9, gap: 0.19, bend: -150 });
+  floatText('iFx', '+$40 paid', { x: 930, y: 520 }, 3.2);
+  between('iHead2', 3.85, 7.6); words('iHead2', 3.9);
+  travel('iDoc', { x: 840, y: 650 }, { x: 350, y: 650 }, { at: 4.3, dur: 1.3, bend: -180, w: 76, h: 96 });
+  between('iNo', 4.6, 7.75); glow('iNo', 4.8, '#f87171', 4);
+  coins('iFx', aEdge, bEdge, { at: 5.2, n: 9, gap: 0.2, bend: -150 });
+  // "So I built AgentPact": the vault slams in and holds the money.
+  slam('iVault', 7.6); shake('iWrap', 7.95, 14);
+  ring('iFx', vault, 7.95); ring('iFx', vault, 8.1, '#2dd4bf', 380);
+  coins('iFx', aEdge, vault, { at: 8.05, n: 7, gap: 0.1, dur: 0.7, bend: -90 });
+  pop('iHeld', 8.75);
+  letters('iTitleText', 7.9);
+  mo('iTitleText', [{ textShadow: '0 0 0 rgba(251,191,36,0)' }, { textShadow: '0 0 48px rgba(251,191,36,.95)' }, { textShadow: '0 0 0 rgba(251,191,36,0)' }], { at: 8.6, dur: 1.2, ease: 'ease-in-out', fill: 'none' });
+  fadeUp('iTag', 8.9, 0.6, 20);
+}
+
+// 0:10 "Everyone building with agents has seen this…" (scene times; the video time is 10 s later)
+function playProblem() {
+  fadeUp('pEye', 0.2, 0.5, 20); words('pHead', 0.35, 0.09);
+  // 0:13 coding agent: CI goes green, the bug ships, the money is gone.
+  fadeUp('v1', 3.0, 0.7, 50);
+  for (let i = 0; i < 5; i++) fadeUp('c1r' + i, 3.45 + i * 0.2, 0.35, 12);
+  pop('c1Pass', 4.5); glow('c1Pass', 4.8, '#34d399');
+  pop('c1Paid', 4.85);
+  fadeUp('c1Prod', 5.3, 0.5, 16);
+  shake('c1Prod', 5.85); mo('c1Total', [{ color: '#e8eef9' }, { color: '#f87171' }], { at: 5.85, dur: 0.3, fill: 'forwards' });
+  mo('c1Prod', [{ borderColor: '#22345a' }, { borderColor: '#f87171' }], { at: 5.85, dur: 0.3, fill: 'forwards' });
+  stamp('c1Stamp', 6.15); mo('c1Strike', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { at: 6.5, dur: 0.35 });
+  // 0:16.5 data agent: the SQL runs, the number is wrong.
+  fadeUp('v2', 6.5, 0.7, 50);
+  ['c2l0', 'c2l1', 'c2l2'].forEach((id, i) => type(id, 6.95 + i * 0.5, 0.45));
+  pop('c2Ran', 8.45);
+  grow('c2Rep', 8.85, 0.8); showIn('c2RepV', 9.45);
+  grow('c2Act', 9.6, 0.7); showIn('c2ActV', 10.1);
+  pop('c2Why', 10.35); stamp('c2Stamp', 10.7);
+  // 0:21 back-office agent: a VAT figure that was never on the invoice.
+  fadeUp('v3', 11.0, 0.7, 50);
+  fadeUp('c3Paper', 11.35, 0.6, 20);
+  mo('c3Ledger', [{ opacity: 0, transform: 'translateX(80px)' }, { opacity: 1, transform: 'none' }], { at: 12.0, dur: 0.6 });
+  pop('c3HlDoc', 12.6); pop('c3HlLed', 12.9); glow('c3HlLed', 13.2, '#f87171');
+  pop('c3Why', 13.15); stamp('c3Stamp', 13.45);
+  // 0:25.5 the fix: the money waits in escrow and moves only when the check passes.
+  ['pEye', 'pHead', 'v1', 'v2', 'v3'].forEach((id) => mo(id, [{ opacity: 1, filter: 'blur(0px)' }, { opacity: 0.14, filter: 'blur(7px)' }], { at: 15.5, dur: 0.9, fill: 'forwards' }));
+  showIn('pFlow', 15.6, 0.5);
+  pop('fP', 15.75); pop('fW', 15.95);
+  slam('fV', 16.1); ring('fFx', { x: 960, y: 560 }, 16.45);
+  words('fText', 16.0, 0.06);
+  coins('fFx', { x: 635, y: 560 }, { x: 960, y: 560 }, { at: 16.6, n: 8, gap: 0.1, dur: 0.75, bend: -90 });
+  pop('fHeld', 17.5);
+  fadeUp('fGate', 17.7, 0.5, 16);
+  between('fChecking', 17.75, 19.4, 0.2, 0.2);
+  mo('fScan', [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { at: 17.9, dur: 1.4, ease: 'linear' });
+  pop('fPass', 19.35);
+  mo('fGate', [{ borderColor: '#2a3d63', boxShadow: '0 0 0 rgba(52,211,153,0)' }, { borderColor: '#34d399', boxShadow: '0 0 50px rgba(52,211,153,.55)' }], { at: 19.35, dur: 0.4, fill: 'forwards' });
+  coins('fFx', { x: 960, y: 560 }, { x: 1285, y: 560 }, { at: 19.75, n: 10, gap: 0.09, dur: 0.8, bend: -90 });
+  // The vault shows $0.00, then $40.00 while it holds the money, then $0.00 once it's paid out.
+  between('fVFull', 16.45, 20.4, 0.2, 0.3);
+  mo('fVEmpty', [{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.05 }, { opacity: 0, offset: 0.925 }, { opacity: 1, offset: 1 }], { at: 16.4, dur: 4, ease: 'linear', fill: 'none' });
+  pop('fPaid', 20.7); ring('fFx', { x: 1360, y: 560 }, 20.6, '#34d399', 240);
+}
+
+// 1:50 "Verification is the missing layer of agent payments. I'm …, and this is AgentPact. Thank you."
+function playOutro() {
+  mo('oHex', [{ opacity: 0, transform: 'scale(.85) rotate(-8deg)' }, { opacity: 0.16, transform: 'none' }], { at: 0.1, dur: 1.6 });
+  fadeUp('oEye', 0.2, 0.5, 18); words('oHead', 0.4, 0.1);
+  pop('oLogo', 3.6); fadeUp('oGit', 4.6, 0.5, 18); fadeUp('oBuilt', 5.2, 0.5, 18);
+}
+
 // ── scene, caption, reveal and camera moves ──
 const frameWin = () => $('dashFrame').contentWindow;
 function scene(id) { document.querySelectorAll('.scene').forEach((s) => s.classList.toggle('on', s.id === id)); }
+function camera(mode) { $('camBox').classList.toggle('on', mode !== 'off'); $('camBox').classList.toggle('outro', mode === 'outro'); }
 function caption(text) {
   const c = $('caption');
   c.classList.remove('show');
   if (text) setTimeout(() => { c.textContent = text; c.classList.add('show'); }, text && c.textContent ? 250 : 0);
 }
 function reveal(id) { $(id).classList.add('show'); }
-function faceMode(mode) { $('lower').style.display = mode === 'intro' ? 'flex' : 'none'; $('outro').style.display = mode === 'outro' ? 'flex' : 'none'; }
 // The camera frames its target above the caption bar, and may pan past the dashboard's bottom edge (same
 // background) so a card at the very bottom still clears the caption.
 const VIEW_H = 930;
@@ -208,9 +537,8 @@ function replayCues(d) {
 }
 
 const CUES = [
-  [0, () => { scene('face'); faceMode('intro'); caption(null); zoom('full'); }],
-  [10, () => scene('problem')],
-  [13, () => reveal('p1')], [16.5, () => reveal('p2')], [21, () => reveal('p3')], [26, () => reveal('p4')],
+  [0, () => { scene('intro'); camera('intro'); caption(null); zoom('full'); playIntro(); }],
+  [10, () => { scene('problem'); camera('off'); playProblem(); }],
   [31, () => run && frameWin().studioReplay(run.task.id, replayCues(run))],
   [32, () => { scene('dash'); caption('A real bug · $40 budget · paid only if CI passes'); }],
   [45, () => { zoom('market'); caption('Agents bid · the cheapest that fits the deadline wins'); }],
@@ -226,7 +554,7 @@ const CUES = [
   [94, () => { zoom('full'); caption(null); }],
   [97, () => scene('how')],
   [98.5, () => reveal('s1')], [100, () => reveal('s2')], [101.5, () => reveal('s3')], [103, () => reveal('s4')], [104.5, () => reveal('s5')], [106, () => reveal('s6')], [107.5, () => reveal('s7')],
-  [110, () => { scene('face'); faceMode('outro'); }],
+  [110, () => { scene('outro'); camera('outro'); playOutro(); }],
 ];
 
 // ── the clock ──
@@ -240,8 +568,9 @@ const bidsLine = () =>
 const sayLine = (i) => (LINES[i] ? LINES[i][2].replaceAll('{name}', $('name').value.trim() || 'the founder').replace('{bids}', bidsLine()) : '');
 function reset() {
   fired = 0;
+  stopMotion();
   document.querySelectorAll('.reveal').forEach((r) => r.classList.remove('show'));
-  caption(null); zoom('full'); scene('face'); faceMode('intro');
+  caption(null); zoom('full'); scene('intro'); camera('intro');
 }
 function tick() {
   if (!running) return;
@@ -266,7 +595,7 @@ async function countdown() {
 function play(end) {
   reset(); onEnd = end; running = true; t0 = performance.now();
   $('now').textContent = sayLine(0); $('now').dataset.i = 0; $('next').textContent = sayLine(1);
-  requestAnimationFrame(tick);
+  tick(); // the first scene starts in this frame, so no unanimated frame is recorded
 }
 
 // ── camera and microphone ──
@@ -279,20 +608,22 @@ async function startCamera() {
     return true;
   } catch {
     try { const audio = await navigator.mediaDevices.getUserMedia({ audio: true }); mic = audio.getAudioTracks()[0]; } catch { mic = null; }
-    $('cam').style.display = 'none'; $('camFallback').style.display = 'block';
+    $('cam').style.display = 'none'; $('camFallback').style.display = 'flex';
     return false;
   }
 }
 const status = (text, warn) => { $('status').textContent = text; $('status').className = warn ? 'warn' : ''; };
 const busy = (on) => { $('rehearse').disabled = on; $('record').disabled = on; };
 
-$('name').addEventListener('input', () => { $('lowerName').textContent = $('name').value.trim() || ' '; try { localStorage.setItem('studio-name', $('name').value); } catch {} });
-try { const saved = localStorage.getItem('studio-name'); if (saved) { $('name').value = saved; $('lowerName').textContent = saved; } } catch {}
+function showName() { const n = $('name').value.trim(); $('lowerName').textContent = n || ' '; $('camInitial').textContent = (n[0] || 'A').toUpperCase(); }
+$('name').addEventListener('input', () => { showName(); try { localStorage.setItem('studio-name', $('name').value); } catch {} });
+try { const saved = localStorage.getItem('studio-name'); if (saved) $('name').value = saved; } catch {}
+showName();
 
 $('rehearse').onclick = async () => {
   busy(true);
   const cam = await startCamera();
-  status(cam ? 'Rehearsal: nothing is recorded.' : 'Rehearsal without a camera: the face scenes show the title card.', !cam);
+  status(cam ? 'Rehearsal: nothing is recorded.' : 'Rehearsal without a camera: your initial shows where your face goes.', !cam);
   await countdown();
   play(() => { busy(false); status('Rehearsal done. Record when ready.'); });
 };
@@ -334,7 +665,7 @@ pickRun().then((d) => {
   run = d;
   status(d ? `Ready. The dashboard part replays ${d.task.id}, a real CI-fix run on production.` : 'No CI-fix run found: run npm run live first.', !d);
 }).catch(() => status('Could not reach the dashboard server: is npm run dashboard running?', true));
-scene('face'); faceMode('intro');
+scene('intro');
 </script>
 </body>
 </html>
