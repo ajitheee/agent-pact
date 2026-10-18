@@ -1,0 +1,13 @@
+{
+  "order": 3,
+  "title": "Accounts payable: 6 vendor invoices into the ledger",
+  "kind": "back-office",
+  "need": "this month's vendor invoices extracted into the ledger",
+  "capability": "data.extraction",
+  "budget": 2000,
+  "prices": { "worker-a": 1200, "mallory": 400 },
+  "check": "It needs no answer key: every extracted figure must appear in its own source invoice, every date must be that invoice's date read in its country's format, and the arithmetic must reconcile (qty x price = amount, lines = subtotal, subtotal + tax = total), so an invented or estimated number fails.",
+  "strength": "traces every figure to its source invoice and reconciles the totals",
+  "mallory": "a hallucination: computes the German VAT instead of reading it (237.50 where the invoice says 237,48)",
+  "bad_reason": "KD-2026-0917: tax 237.50 doesn't appear in the document: invented value"
+}

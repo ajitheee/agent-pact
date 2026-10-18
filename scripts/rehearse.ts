@@ -2,7 +2,7 @@
 // Each run is the real thing: the Claude Code poster, worker A, a fresh Mallory, Stripe holds, the check in Blaxel,
 // the email thread and the monitor's audit. Then a summary table, and the dataset is refreshed (npm run dataset).
 //   npm run rehearse                    all scenarios (about 6 minutes)
-//   npm run rehearse -- leads bugfix    just these
+//   npm run rehearse -- sql-report      just these
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,7 +36,7 @@ for (const [i, name] of names.entries()) {
 
 const db = await openDb();
 console.log(paint('1', `\nRehearsal summary: ${names.length} scenario${names.length === 1 ? '' : 's'}\n`));
-console.log(paint('2', `  ${'scenario'.padEnd(10)} ${'task'.padEnd(12)} ${'status'.padEnd(10)} ${'Mallory'.padEnd(20)} ${'worker A'.padEnd(16)} ${'monitor'.padEnd(9)} time`));
+console.log(paint('2', `  ${'scenario'.padEnd(12)} ${'task'.padEnd(12)} ${'status'.padEnd(10)} ${'Mallory'.padEnd(20)} ${'worker A'.padEnd(16)} ${'monitor'.padEnd(9)} time`));
 let problems = 0;
 for (const r of results) {
   const [task] = r.taskId ? await db.query<{ id: string; status: string }>('SELECT id, status FROM tasks WHERE id = $1', [r.taskId]) : [];
@@ -49,7 +49,7 @@ for (const r of results) {
   const ok = task?.status === 'completed' && mallory?.escrow === 'released' && workerA?.escrow === 'captured' && audit && audit.verdict !== 'broken';
   if (!ok) problems++;
   console.log(
-    `  ${ok ? paint('32', '✓') : paint('31', '✗')} ${r.name.padEnd(8)} ${(task?.id ?? 'no task').padEnd(12)} ${(task?.status ?? '-').padEnd(10)} ` +
+    `  ${ok ? paint('32', '✓') : paint('31', '✗')} ${r.name.padEnd(10)} ${(task?.id ?? 'no task').padEnd(12)} ${(task?.status ?? '-').padEnd(10)} ` +
       `${(mallory ? `${mallory.outcome}, ${mallory.escrow}` : '-').padEnd(20)} ${(workerA ? `${workerA.outcome} ${usd(workerA.amount)}` : '-').padEnd(16)} ` +
       `${(audit?.verdict ?? '-').padEnd(9)} ${r.seconds}s`,
   );

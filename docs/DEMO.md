@@ -26,35 +26,37 @@ pay only after the work is verified."*
 
 | Say | Screen |
 |---|---|
-| "Three agents on three different MCP clients, one escrow server on Manufact." | Header: poster = Claude Code, worker-a = mcp-use, mallory = mcp-use |
-| "The poster needs a function written. It posts a $2 task, and the acceptance criteria are tests, not prose: 9 examples plus 25 random titles generated at check time, so nobody can hardcode the answers." | `POSTED  $2.00 budget · 240s deadline · Python check, run in a sandbox` |
-| "Workers bid within seconds, from three different clients. Mallory is new and cheapest; worker B in Claude Desktop is cheap but slow." | The `BID` lines: `worker-b  Claude Desktop  $0.80  ETA 300s  ✗ misses the deadline` |
-| "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes 55 cents: held, not moved." | The `POSTER` line naming worker B's ETA, then `HELD  $0.55 held on Stripe for mallory-…` |
-| **"Mallory delivers code that looks finished. The tests run in a Blaxel sandbox, never on the worker, with her code in its own process so it can't touch the judge. It fails on the first example. The hold is released, so the poster pays nothing, and Mallory's record drops to zero."** | `FAIL  mallory-…: slugify('Hello, World!') returned 'hello,-world!', expected 'hello-world'`, then `tested in Blaxel · hold released` |
-| "The poster filters by reputation and re-hires worker A." | The `POSTER` line about filtering by reputation, then `HELD  $1.50 held on Stripe for worker-a` |
-| "All 34 checks pass in Blaxel. A dollar fifty captured. No human touched anything." | `PASS  worker-a: passed the check in Blaxel · $1.50 captured` |
-| "Then a second pair of eyes: the monitor audits the whole job. It replays every step, checks each payment against Stripe, re-runs the check on both deliveries, and looks for cheating. Here it caught that this 'new' Mallory delivered byte-for-byte the same code as an earlier one: same operator, new name. That goes into the pact's memory." | `Monitor audit … FLAGGED`, the ✓ lines, then `⚑ same operator?` |
+| "Three agents on three different MCP clients, one escrow server on Manufact." | Header: poster = Claude Code, worker-a = mcp-use, mallory = mcp-use, worker-b = Claude Desktop |
+| "CI is red on our pricing service: customers are charged tax on the full price. The poster hires an agent to fix it, $40 budget. The acceptance criteria are our CI suite, not a prompt: 8 named tests plus 200 randomized carts generated when the work comes back." | `POSTED  $40.00 budget · 240s deadline · Python check, run in a sandbox` |
+| "Agents bid within seconds, from three different clients. Mallory is new and cheapest at $9. Worker B in Claude Desktop is cheaper than worker A, but too slow." | The `BID` lines: `worker-b  Claude Desktop  $20.00  ETA 300s  ✗ misses the deadline` |
+| "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes $9: held, not moved." | The `POSTER` line naming worker B's ETA, then `HELD  $9.00 held on Stripe for mallory-…` |
+| **"This is the thing everyone building with coding agents has seen: Mallory makes CI green by special-casing the 8 test carts and leaves the bug in. The check runs her code in a Blaxel sandbox, in its own process, and the hidden random carts catch it. The hold is released: the poster pays nothing."** | `FAIL  mallory-…: hidden test: random cart #1 (…): got subtotal …; expected …`, then `checked in Blaxel · hold released` |
+| "The poster filters by reputation and re-hires worker A." | `HELD  $25.00 held on Stripe for worker-a` |
+| "Worker A's fix passes all 208 cases. $25 captured. No human touched anything." | `PASS  worker-a: passed · checked in Blaxel · $25.00 captured` |
+| "And here's what the poster actually got: a patch, ready to merge." | `Output delivered to the poster`: the green/red diff of pricing.py |
+| "Then a second pair of eyes: the monitor audits the whole job. It replays every step, checks each payment against Stripe, re-runs the tests on both deliveries, and flags Mallory: *gamed the tests*. That goes into the pact's memory and onto her watchlist." | `Monitor audit … FLAGGED`, the ✓ lines, then `⚑ gamed the tests` |
 | "Here's Stripe: one hold canceled, one captured, and the verdict is written on each payment." | Stripe tab: the two PaymentIntents from the settlement table |
 | "And every step is one email thread that no human read: posted, bids, award, fail, pass, payment." | Primitive: poster@ inbox, the task's thread |
 
-**Second demo, if there's time** (`npm run live -- --scenario leads` or `bugfix`): same flow, different work and a
-different cheat. With `leads`, Mallory slips in a company that isn't in the directory, and the monitor flags it as
-*invented data*. With `bugfix`, Mallory hardcodes the public examples, hidden random tests catch it, and the monitor
-flags it as *looks memorized*.
+**Second demo, if there's time:** same market, different kind of agent work.
+- `npm run live -- --scenario sql-report`: "Finance needs the board-deck number." Mallory's query runs fine and returns the
+  wrong revenue (the classic JOIN fan-out). The check runs every query on 3 fresh random databases and names the
+  mistake. The output is the revenue table and the query.
+- `npm run live -- --scenario invoices`: "Accounts payable: 6 vendor invoices into the ledger." Mallory computes the
+  German VAT instead of reading it (237.50 where the invoice says 237,48). The check traces every figure to its source
+  invoice and flags it as an invented value. The output is the ledger, ready to import.
 
-**The five scenarios** (`npm run live -- --scenario <name>`)
+**The three scenarios** (`npm run live -- --scenario <name>`)
 
-| Name | Kind | The work | How Mallory fails | The monitor says |
-|---|---|---|---|---|
-| `slugify` | code | Write `slugify(title)` | Code that only looks finished (punctuation leaks) | failed the check |
-| `bugfix` | code, a fix | Fix `parse_duration("1h30m")` | **Cheats**: a lookup table of the public examples | ⚑ looks memorized |
-| `orders` | data, fixed format | Order CSV to JSON in whole cents | Float math: `13980.000000000002` cents | failed the check |
-| `leads` | lead data | Qualify leads from a directory of 24 fictional companies | **Cheats**: an invented company, one real lead missing | ⚑ invented data |
-| `catalog` | data, JSON Schema | Product lines to records | Prices left as text (`"$18.00"`) | failed the check |
+| Name | Agent work | Budget | How it's checked | How Mallory fails | Monitor |
+|---|---|---|---|---|---|
+| `ci-fix` | Coding agent: fix a production bug so CI goes green | $40 | 8 named tests + 200 random carts, code run in its own sandboxed process | **Games the tests**: special-cases the 8 CI carts | ⚑ gamed the tests |
+| `sql-report` | Data agent: Q3 net revenue by region for the board deck | $30 | The query runs on 3 fresh random databases with quarter-boundary orders | Plausible SQL with a JOIN fan-out; the check names the mistake | failed the check |
+| `invoices` | Back-office agent: 6 vendor invoices (US, DE, UK, FR formats) into the ledger | $20 | No answer key: every figure traced to its source invoice, dates read per country, totals reconciled | **Hallucinates** the German VAT | ⚑ invented data |
 
-Every scenario's check runs in Blaxel except `catalog`, which is a JSON Schema (it checks shape, not truth; say so if
-asked). Worker A passes all five. On any run where Mallory's delivery matches an earlier Mallory's, the monitor also
-flags *same operator?*.
+Every check runs in Blaxel. Worker A passes all three. When a "new" Mallory delivers exactly what an earlier one did,
+the monitor also flags *same operator?*. Each run ends with the output the poster received: a diff, a revenue table,
+a ledger.
 
 **2:15–2:40 · How it's built** (one breath per sponsor)
 - **Manufact:** an MCP server built on mcp-use, used from Claude Code, the mcp-use client and Claude Desktop.
@@ -72,7 +74,7 @@ flags *same operator?*.
 - [ ] `npm run preflight`: every line should be ✓. It checks the server build, the agent tokens, the server's
       Python sandbox, Blaxel, Stripe, the poster's Anthropic credits, Primitive and the worker B setup, in about
       10 seconds, and each ✗ line says what to fix.
-- [ ] `npm run rehearse`: all five scenarios end to end against production, one after another (about 6 minutes),
+- [ ] `npm run rehearse`: all three scenarios end to end against production, one after another (about 4 minutes),
       then a summary table (every line ✓) and a refreshed dataset in `dataset/`. Each run starts with a warm-up that
       wakes the server, the database pool and the Blaxel sandbox.
 - [ ] Open the tabs: Stripe payments in the sandbox (click a link in the rehearsal's settlement table; the links
@@ -107,7 +109,7 @@ flags *same operator?*.
 - [ ] Set the terminal to a large font, maximize it, and turn off notifications. The screen is a presenter view: one
       line per market event. `npm run live -- --verbose` shows every tool call instead, for debugging.
 
-**On stage:** run `npm run live -- --with-worker-b` (slugify), narrate from the table above, then a second scenario if
+**On stage:** run `npm run live -- --with-worker-b` (ci-fix), narrate from the table above, then a second scenario if
 there's time. Say the warm-up line if anyone asks about setup.
 The poster waits up to 90 seconds for bids, so keep talking if there's a pause.
 
@@ -134,17 +136,21 @@ tab and the Primitive thread. Keep it under 3 minutes.
 **Demand evidence:** ask 5 builders "would your agent use this?" and write their exact words here:
 1. …
 
-**"The verifier only checks format, not truth."** For code it checks truth: the tests run the delivered function on
-25 inputs generated at check time, which no worker saw in advance. For data tasks, verification is as strong as the
-check the poster writes. We make strong checks cheap: code instead of prose, sandboxed in Blaxel. Next steps are
-checks against reference data, attested sources, and staked judges.
+**"The verifier only checks format, not truth."** Our three checks check truth three different ways. Code: the CI
+suite plus 200 random carts generated when the work comes back, so the fix has to be correct, not just pass the visible
+tests. SQL: the query runs on fresh random databases and must return the right number. Documents: no answer key needed;
+every figure must appear in its own source and the totals must reconcile. Verification is as strong as the check the
+poster writes, and we make strong checks cheap: code instead of prose, sandboxed in Blaxel. Next: checks against
+live reference data, attested sources and staked judges.
 
 **"Can the worker's code cheat the tests?"** It runs in a separate process inside the Blaxel sandbox: no network, no
 file writes, no subprocesses, and no shared memory with the tests. The tests only see the values its function
-returned. Our test suite tries hardcoded answers and a forged verdict, and both fail.
+returned. Our test suite tries gaming the tests, a forged verdict and sandbox escapes, and all of them fail.
 
-**"Why did the demo switch from contacts to code?"** Worker B is Claude, and it declined to compile real people's names
-and work emails. That's the right call, and a code task with tests is the better demo anyway.
+**"Why these three tasks?"** They're the work companies hand to agents today: coding agents fixing bugs, data agents
+writing the SQL behind a number, back-office agents processing documents. Each has the failure everyone has seen:
+tests gamed instead of code fixed, a query that runs but is wrong, a number that sounds right but was never in the
+document. Each is a job where "pay only if it checks out" changes who you can hire.
 
 **"Why not just settle over x402 or MPP?"** They settle instantly. We're the step before settlement: hold, verify,
 then release. The payment rail is an interface; Stripe is the first, and x402 or MPP can follow.
@@ -155,8 +161,7 @@ reputation. Posters can require a minimum score. Next is a worker stake that the
 **"What if the agent cheats, or lies about what it did?"** It can't certify itself: the check runs on our side, in
 Blaxel, and the money moves only on its verdict. Then the monitor audits every finished job independently: it
 replays the event log (every step, in order), matches each hold to its verdict in our database and on Stripe,
-re-runs the check on every delivery with fresh random inputs, and flags cheating. So far it catches memorized
-answers, invented data, sandbox escapes and one operator behind several names. Findings go into the pact's memory:
+re-runs the check on every delivery with fresh random inputs, and flags cheating. So far it catches gamed tests, invented data, sandbox escapes and one operator behind several names. Findings go into the pact's memory:
 an audit per task and a watchlist per worker (`npm run audit -- --watchlist`).
 
 **"What does the pact remember?"** Everything, in Postgres: every task, bid, hold, verdict and reason; each worker's

@@ -1,14 +1,14 @@
 // `npm run live`: the whole demo in one terminal, against the server in clients/tokens.local.json
 // (production after `npm run setup:clients -- --url …`). For rehearsals and the backup video.
 //
-//   worker-a        mcp-use client, honest: bids 150¢ / 90s, delivers a slugify() that passes the tests
-//   mallory-xxxx    mcp-use client, cheapest: bids 55¢ / 30s, delivers a slugify() that only looks finished. A fresh identity each
+//   worker-a        mcp-use client, honest: bids about 60% of the budget / 90s, delivers work that passes the check
+//   mallory-xxxx    mcp-use client, cheapest: bids about 20% of the budget / 30s, delivers work that fails it. A fresh identity each
 //                   run, so every take shows "new agent gets a shot, fails, refunded" instead of a known bad actor.
 //   poster          Claude Code: posts the task, picks the cheapest bid that fits the deadline (Mallory), sees
 //                   her fail and get refunded, filters by reputation, re-awards to worker A, who gets paid.
 //
-//   npm run live -- --scenario leads  picks the task from clients/scenarios/ (slugify, bugfix, orders, leads, catalog);
-//                   Mallory's delivery fails a different way in each. Default: slugify.
+//   npm run live -- --scenario sql-report  picks the task from clients/scenarios/ (ci-fix, sql-report, invoices);
+//                   Mallory fails a different way in each. Default: ci-fix. The run ends with the output the poster got.
 //
 //   npm run live -- --with-worker-b   adds the third client: worker B in Claude Desktop (escrow-worker-b server).
 //                   Its prompt goes on the clipboard. Paste and send it before the poster starts: worker B
@@ -17,8 +17,8 @@
 //
 // The screen is a presenter view: one line per market event (posted, bids, Stripe holds, verdicts), read from the
 // escrow's own event log, plus the poster's one-line decisions. --verbose shows every tool call and worker log instead.
-import { spawn, type ChildProcess } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createInterface as createPrompt } from 'node:readline/promises';
 import { mintToken } from '../src/agents.js';
@@ -34,7 +34,7 @@ const tokens = JSON.parse(readFileSync('clients/tokens.local.json', 'utf8')) as 
 const withWorkerB = process.argv.includes('--with-worker-b');
 const verbose = process.argv.includes('--verbose');
 const flag = (name: string) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined);
-const scenario = loadScenario(flag('--scenario') ?? 'slugify');
+const scenario = loadScenario(flag('--scenario') ?? 'ci-fix');
 /** The task this run's poster posted, read from its post_task result, so back-to-back runs never mix up tasks. */
 const runTask: { id?: string } = {};
 const paint = (code: string, s: string) => `\x1b[${code}m${s}\x1b[0m`;
@@ -44,6 +44,19 @@ const clock = () => paint('2', `${String(Math.round((Date.now() - started) / 100
 const say = (kind: string, color: string, text: string) => console.log(`${clock()}  ${paint(`${color};1`, kind.padEnd(7))}  ${text}`);
 const INDENT = ' '.repeat(16);
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+/** Word-wrap to lines of at most `width`, keeping at most `max` lines (the last one clipped). */
+function wrap(s: string, width: number, max: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of s.split(' ')) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else line = line ? `${line} ${word}` : word;
+  }
+  if (line) lines.push(line);
+  return lines.length > max ? [...lines.slice(0, max - 1), clip(lines.slice(max - 1).join(' '), width)] : lines;
+}
 
 // A fresh Mallory, registered straight in the shared database.
 const db = await openDb();
@@ -142,21 +155,33 @@ const workerView: View = (text) => (verbose || /connect attempt|submit failed|sk
 /** Presenter view of the poster: only its short decision lines, not tool calls or the closing summary. */
 function posterView(): View {
   let summary = false;
+  const read = new Set<string>();
   return (text) => {
     runTask.id ??= /"task_id":"(t_[0-9a-z]+)","status":"open"/.exec(text)?.[1];
     if (verbose) return text;
+    // Before the task is posted the poster reads the ticket and its check, then writes the job post: show that,
+    // so the screen isn't still for the 30-50 seconds it takes.
+    const file = /^→ Read (\S+)/.exec(text)?.[1];
+    if (file && !runTask.id) {
+      const what = /spec\.txt$/.test(file) ? 'the ticket' : /verify\.py$|schema\.json$/.test(file) ? 'its acceptance check' : 'a file';
+      say('POSTER', '36', paint('2', `reading ${what} (${file.split('/').pop()})`));
+      read.add(what);
+      if (read.has('the ticket') && read.has('its acceptance check')) say('POSTER', '36', paint('2', 'writing the job post: the task, budget, deadline and the check that decides payment…'));
+      return null;
+    }
     if (!text.trim()) summary = true; // the closing summary follows a blank line; the settlement table covers it
     else if (!summary && /^  \S/.test(text)) say('POSTER', '36', `"${clip(text.trim(), 150)}"`);
     return null;
   };
 }
 
-const startWorkerA = () => attach('worker-a', '32', node(['--import', 'tsx', 'clients/worker-a.ts', '--once']), undefined, workerView);
+const startWorkerA = () =>
+  attach('worker-a', '32', node(['--import', 'tsx', 'clients/worker-a.ts', '--price', String(scenario.prices['worker-a']), '--once']), undefined, workerView);
 const startMallory = () =>
   attach(
     mallory,
     '35',
-    node(['--import', 'tsx', 'clients/worker-a.ts', '--as', mallory, '--price', '55', '--eta', '30', '--garbage', '--once'], { ESCROW_AGENT_TOKEN: malloryToken }),
+    node(['--import', 'tsx', 'clients/worker-a.ts', '--as', mallory, '--price', String(scenario.prices.mallory), '--eta', '30', '--garbage', '--once'], { ESCROW_AGENT_TOKEN: malloryToken }),
     undefined,
     workerView,
   );
@@ -217,7 +242,10 @@ function showEvent(task: { spec: string; deadline_at: number }, e: EventRow) {
     case 'awarded':
       return say('HELD', '33', `${usd(d.price)} held on Stripe for ${d.worker} · authorized, not moved`);
     case 'failed':
-      say('FAIL', '31', `${e.actor}: ${clip(d.reason, 110)}`);
+      // Wrapped, not clipped: the end of a reason is often the useful part ("…matches a known mistake: …").
+      const [first, ...rest] = wrap(`${e.actor}: ${d.reason}`, 110, 3);
+      say('FAIL', '31', first);
+      for (const line of rest) console.log(INDENT + line);
       return console.log(INDENT + paint('2', `checked ${where(d.sandbox)} · hold released, the poster pays nothing`));
     case 'passed':
       return say('PASS', '32', `${e.actor}: passed · checked ${where(d.sandbox)} · ${usd(d.amount)} captured`);
@@ -272,7 +300,21 @@ if (task) {
   for (const a of attempts) {
     const verdict = a.outcome === 'passed' ? paint('32', 'PASS') : paint('31', a.outcome.toUpperCase());
     console.log(`  ${a.worker_id.padEnd(13)} ${usd(a.amount).padStart(6)}  ${verdict}  escrow ${a.escrow.padEnd(9)} ${dashboard}/payments/${a.payment_intent}`);
-    if (a.reason) console.log(paint('2', `  ${''.padEnd(13)} ${clip(a.reason, 150)}`));
+    if (a.reason) for (const line of wrap(a.reason, 120, 2)) console.log(paint('2', `  ${''.padEnd(13)} ${line}`));
+  }
+  // What the poster paid for: the scenario's show.py renders the delivery that passed (a diff, a report, a ledger).
+  const [delivered] = await summary.query<{ worker_id: string; payload: string }>(
+    "SELECT worker_id, payload FROM attempts WHERE task_id = $1 AND outcome = 'passed'",
+    [task.id],
+  );
+  const show = `clients/scenarios/${scenario.name}/show.py`;
+  if (delivered && existsSync(show)) {
+    const out = spawnSync(config.pythonBin, ['-I', '-X', 'utf8', show], { input: delivered.payload, encoding: 'utf8', timeout: 20_000 });
+    console.log(paint('1', `\nOutput delivered to the poster by ${delivered.worker_id}`));
+    for (const line of (out.stdout || out.stderr || 'could not render the output').trimEnd().split('\n')) {
+      const color = /^[+](?![+])/.test(line) ? '32' : /^-(?!-)/.test(line) ? '31' : '';
+      console.log(`  ${color ? paint(color, line) : line}`);
+    }
   }
   // The monitor: an independent audit of the steps, the money and every delivery, saved in the pact's memory.
   console.log('');

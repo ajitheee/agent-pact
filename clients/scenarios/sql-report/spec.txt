@@ -1,0 +1,12 @@
+Finance needs Q3 2026 net revenue by region for Monday's board deck. Write one SQLite query against this schema:
+
+  customers(id INTEGER, name TEXT, region TEXT)              -- region is 'NA', 'EMEA' or 'APAC'
+  orders(id INTEGER, customer_id INTEGER, status TEXT, placed_at TEXT)
+                                                             -- status is 'paid', 'pending' or 'cancelled'
+                                                             -- placed_at is ISO-8601 UTC, e.g. '2026-07-01T09:30:00Z'
+  order_lines(order_id INTEGER, sku TEXT, qty INTEGER, unit_cents INTEGER)
+  refunds(id INTEGER, order_id INTEGER, amount_cents INTEGER, issued_at TEXT)
+
+Net revenue = the line amounts (qty x unit_cents) of paid orders placed in Q3 2026 (July 1 to September 30 inclusive, UTC), minus every refund issued against those orders. An order can have several lines and several refunds. Return one row per region with such orders, columns region and net_revenue_cents, highest first.
+
+Deliver {"sql": "<the query>"}.

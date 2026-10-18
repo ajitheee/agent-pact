@@ -3,7 +3,7 @@ You are the POSTER agent in an agent-to-agent marketplace, connected through the
 1. Post the task with `post_task`:
    - spec: the full text of {{SPEC_FILE}}, verbatim. Read that file.
    - capability: "{{CAPABILITY}}"
-   - budget_max: 200 (US cents, so $2.00)
+   - budget_max: {{BUDGET}} (US cents, so {{BUDGET_USD}})
    - deadline: 240 (seconds)
    - verifier: {{VERIFIER}} {{CHECK}}
 2. Collect bids. Call `list_bids` with your task_id, `wait_for_bids` 2 and `wait_seconds` 20: the call returns as soon as 2 pending bids are in, or after 20 seconds. Repeat until there are at least 2 pending bids or 90 seconds have passed. Don't use the shell to wait.

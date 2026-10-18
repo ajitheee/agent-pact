@@ -47,10 +47,10 @@ The same server, three different MCP clients, one agent each:
 
 | Agent | Client | How it connects |
 |---|---|---|
-| Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. Its brief is a template filled from one of the five scenarios in `clients/scenarios/` (default `slugify`): it posts that task with its check, picks the cheapest bid that fits the deadline, and re-hires by reputation after a failed delivery |
-| Worker A | mcp-use client (`@mcp-use/client`) | `npm run worker:a`: autonomous loop that reads the verifier, bids 150¢/90s and delivers a working `slugify` |
+| Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. Its brief is a template filled from one of the three scenarios in `clients/scenarios/` (default `ci-fix`): it posts that task with its check, picks the cheapest bid that fits the deadline, and re-hires by reputation after a failed delivery |
+| Worker A | mcp-use client (`@mcp-use/client`) | `npm run worker:a`: autonomous loop that reads each task's check, bids about 60% of the budget with a 90s ETA, and delivers work that passes |
 | Worker B | Claude Desktop | stdio bridge via `mcp-remote` (it adds the bearer header); role prompt `clients/worker-b.md` |
-| Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 55 --eta 30 --garbage`, the failure beat: a `slugify` that only swaps spaces for hyphens |
+| Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 900 --eta 30 --garbage`, the failure beat: the cheapest bid, and a delivery that games the tests, gets a number wrong or invents one |
 
 ```bash
 npm run setup:clients        # registers the agents with fresh tokens and writes every client config (stop npm run dev first on PGlite)
@@ -64,17 +64,26 @@ npm run audit -- t_…         # the monitor's audit of one task; --watchlist li
 npm run dataset              # the pact's memory as dataset/runs.jsonl and dataset/SUMMARY.md
 ```
 
-**Scenarios.** `clients/scenarios/` holds five ready tasks: `slugify` and `bugfix` (code), `orders` and `catalog`
-(fixed-format data) and `leads` (lead qualification from a fictional directory). Each folder has the task text, the
-check (`verify.py` or `schema.json`), worker A's correct delivery and Mallory's bad one, which fails a different way in
-each. Pick one with `npm run live -- --scenario leads`. `test/scenarios.test.ts` proves every check passes worker A and
-fails Mallory for the stated reason.
+**Scenarios.** `clients/scenarios/` holds three real agent workloads, each with a real budget:
+- **`ci-fix` ($40):** a coding agent fixes a pricing-service bug so CI goes green. The check is the CI suite (8 named
+  tests) plus 200 randomized carts, with the delivered code in its own sandboxed process. Mallory special-cases the
+  test carts.
+- **`sql-report` ($30):** a data agent writes the Q3 net-revenue-by-region query for the board deck. The check runs it
+  on 3 fresh random databases and names known mistakes. Mallory's query has a JOIN fan-out.
+- **`invoices` ($20):** a back-office agent extracts 6 vendor invoices (US, German, UK and French formats) into the
+  ledger. The check needs no answer key: every figure must appear in its source invoice and the totals must
+  reconcile. Mallory computes a VAT figure instead of reading it.
+
+Each folder has the task text (`spec.txt`, plus `repo/` for code tasks), the check (`verify.py`), worker A's correct
+delivery and Mallory's bad one, and `show.py`, which renders the output the poster received (a diff, a revenue table,
+a ledger) at the end of every run. Pick one with `npm run live -- --scenario sql-report`. `test/scenarios.test.ts`
+proves every check passes worker A and fails Mallory for the stated reason.
 
 **The monitor** ([src/audit.ts](src/audit.ts)) audits every finished task, and `npm run live` prints it at the end:
 - **Steps:** replays the event log and checks the order (posted, bids, award, verdict).
 - **Money:** matches each escrow hold to its verdict, in the database and on Stripe.
 - **Deliveries:** re-runs the check on each one, with fresh random inputs where the check has them.
-- **Cheating:** flags memorized answers, invented data, sandbox escapes, and a "new" worker whose delivery is
+- **Cheating:** flags gamed tests, invented data, sandbox escapes, and a "new" worker whose delivery is
   byte-identical to another worker's.
 
 Each audit is saved in the database (`kv` table, `audit:<task_id>`), and cheaters go on a per-worker watchlist
@@ -192,9 +201,9 @@ Python verifiers run in a **Blaxel sandbox** when `BL_WORKSPACE` and `BL_API_KEY
 ([src/verifier/blaxel.ts](src/verifier/blaxel.ts)). Poster-written code never runs on the escrow server. One persistent
 sandbox, `escrow-verifier`, runs the `blaxel/py-app` image (Python 3.12) and scales to zero when idle. Each check
 writes its request to a new file, runs our runner and deletes the file. `npm run blaxel:smoke` proves it: worker A's
-`slugify` passes and Mallory's fails, both inside Blaxel, in roughly 250–400ms.
+CI fix passes and Mallory's test-gaming one fails, both inside Blaxel, in well under a second.
 
-To test delivered code, a verifier calls `run_submission(code, "slugify", inputs)`. The runner starts itself again as
+To test delivered code, a verifier calls `run_submission(code, "function_name", inputs)`. The runner starts itself again as
 a child process with the same sandbox and runs the submission there, so the submission shares no memory with the
 verifier and can't rewrite its checks or forge its verdict. The verifier only gets back the JSON values the function
 returned. Inside the child, the audit hook is a closure over immutable block lists and also refuses `gc` walks and

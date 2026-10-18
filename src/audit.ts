@@ -3,7 +3,7 @@
 // It trusts nothing the market recorded. It replays the event log to check every step happened in order,
 // matches each escrow hold to its verdict in the database and on Stripe, and re-runs the task's check on
 // every stored delivery (with fresh random inputs where the check has them). Then it looks for cheating:
-// answers memorized from the public examples, invented data, sandbox escapes, and a "new" worker whose
+// tests gamed by special-casing the visible ones, invented data, sandbox escapes, and a "new" worker whose
 // delivery is byte-identical to another worker's. The audit is saved in the pact's memory (kv
 // audit:<task_id>) and cheats go on a per-worker watchlist (kv watch:<worker_id>).
 import type { AttemptRow, Db, EventRow, TaskRow } from './db.js';
@@ -38,7 +38,7 @@ export interface Audit {
 
 /** Failure reasons that mean the worker tried to game the check, not just did poor work. */
 const CHEATS: { pattern: RegExp; label: string; detail: string }[] = [
-  { pattern: /^hidden test:/, label: 'looks memorized', detail: 'passed every public example but failed a hidden one' },
+  { pattern: /^hidden test:/, label: 'gamed the tests', detail: 'passed every visible test but failed hidden ones: it special-cased the tests instead of doing the work' },
   { pattern: /not in the directory|invented/, label: 'invented data', detail: "delivered data that isn't in the source" },
   { pattern: /sandbox: |is not allowed/, label: 'sandbox escape', detail: 'tried to break out of the sandbox' },
 ];

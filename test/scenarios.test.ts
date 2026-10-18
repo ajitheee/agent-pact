@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { loadScenarios, scenarioOf } from '../clients/scenarios.js';
 import { Verifiers } from '../src/verifier/index.js';
@@ -20,10 +22,12 @@ describe('demo scenarios', () => {
 
     it(`${s.name}: the task text and the check use the same data, and the check is recognizable`, () => {
       assert.equal(scenarioOf(s.verifier), s.name);
-      if (s.verifier.type !== 'python') return;
-      // Data scenarios embed their source table in the check; it must match the task text exactly.
-      const table = /"""([\s\S]*?)"""/.exec(s.verifier.code)?.[1];
-      if (table && table.includes('\n')) assert.ok(s.spec.includes(table.trim()), `${s.name}: spec.txt and verify.py disagree on the data`);
+      // Source data embedded in the check ("""…""" blocks; internal snippets use '''…''') must match the task text
+      // exactly, and so must the files of the repo the task hands over.
+      const blocks = s.verifier.type === 'python' ? [...s.verifier.code.matchAll(/"""([\s\S]*?)"""/g)].map((m) => m[1]).filter((b) => b.includes('\n')) : [];
+      const repo = join('clients/scenarios', s.name, 'repo');
+      const files = existsSync(repo) ? readdirSync(repo).map((f) => readFileSync(join(repo, f), 'utf8')) : [];
+      for (const text of [...blocks, ...files]) assert.ok(s.spec.includes(text.trim()), `${s.name}: spec.txt doesn't contain: ${text.trim().slice(0, 60)}…`);
     });
   }
 });

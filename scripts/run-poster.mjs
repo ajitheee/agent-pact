@@ -4,7 +4,7 @@
 //   npm run poster -- --stream  every tool call and result as it happens (used by npm run live)
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { createInterface } from 'node:readline';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -28,8 +28,8 @@ console.log(
     (process.env.ANTHROPIC_WORKSPACE_ID ? ` (workspace ${process.env.ANTHROPIC_WORKSPACE_ID})` : ''),
 );
 const child = spawn(exe, args, { stdio: ['pipe', stream ? 'pipe' : 'inherit', 'inherit'] });
-// The brief is a template; POSTER_SCENARIO (default slugify) picks the task from clients/scenarios/.
-const scenario = process.env.POSTER_SCENARIO ?? 'slugify';
+// The brief is a template; POSTER_SCENARIO (default ci-fix) picks the task from clients/scenarios/.
+const scenario = process.env.POSTER_SCENARIO ?? 'ci-fix';
 const dir = `clients/scenarios/${scenario}`;
 const meta = JSON.parse(readFileSync(`${dir}/scenario.json`, 'utf8'));
 const verifier = existsSync(`${dir}/verify.py`)
@@ -39,6 +39,8 @@ let brief = readFileSync('clients/poster.md', 'utf8')
   .replaceAll('{{NEED}}', meta.need)
   .replaceAll('{{SPEC_FILE}}', `${dir}/spec.txt`)
   .replaceAll('{{CAPABILITY}}', meta.capability)
+  .replaceAll('{{BUDGET}}', String(meta.budget))
+  .replaceAll('{{BUDGET_USD}}', `$${(meta.budget / 100).toFixed(2)}`)
   .replaceAll('{{VERIFIER}}', verifier)
   .replaceAll('{{CHECK}}', meta.check);
 // POSTER_MIN_BIDS=3 (set by `npm run live -- --with-worker-b`) makes the poster wait for a third bid from Claude Desktop.
@@ -61,7 +63,10 @@ function render(line) {
   const blocks = event.message?.content ?? [];
   if (event.type === 'assistant') {
     for (const b of blocks) {
-      if (b.type === 'tool_use') {
+      if (b.type === 'tool_use' && b.name === 'Read' && b.input?.file_path) {
+        // The project-relative path, so viewers (and npm run live) can tell which file the poster is reading.
+        console.log(`→ Read ${relative(process.cwd(), b.input.file_path).replaceAll('\\', '/')}`);
+      } else if (b.type === 'tool_use') {
         const tool = b.name.replace(/^mcp__escrow__/, '');
         // The verifier code is long; show its type, not its body.
         const v = b.input?.verifier;

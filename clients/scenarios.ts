@@ -3,8 +3,9 @@
 //   scenario.json   title, kind, capability, what the check does, and Mallory's failure (bad_reason, a regex)
 //   spec.txt        the task text the poster posts
 //   verify.py       a Python check (first line "# scenario: <name>"), or schema.json, a JSON Schema titled "scenario:<name>"
-//   good.py|json    worker A's correct delivery (.py means {"code": <file>})
-//   bad.py|json     Mallory's delivery
+//   good/ | good.py | good.json   worker A's correct delivery (a folder means {"files": {...}}, .py means {"code": <file>})
+//   bad/ | bad.py | bad.json      Mallory's delivery
+//   show.py         optional: prints the output the poster received, from the delivered payload on stdin
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -14,9 +15,12 @@ export interface Scenario {
   name: string;
   order: number;
   title: string;
-  kind: 'code' | 'data' | 'leads';
+  kind: 'code' | 'data' | 'back-office';
   need: string;
   capability: string;
+  /** Budget in US cents, and the scripted workers' bids. */
+  budget: number;
+  prices: { 'worker-a': number; mallory: number };
   check: string;
   strength: string;
   mallory: string;
@@ -33,7 +37,13 @@ export function loadScenario(name: string): Scenario {
   const dir = join(ROOT, name);
   if (!existsSync(join(dir, 'scenario.json'))) throw new Error(`no scenario "${name}"; choose one of: ${scenarioNames().join(', ')}`);
   const read = (file: string) => readFileSync(join(dir, file), 'utf8');
-  const delivery = (stem: string) => (existsSync(join(dir, `${stem}.py`)) ? { code: read(`${stem}.py`) } : JSON.parse(read(`${stem}.json`)));
+  // A delivery is a folder of files ({"files": {name: text}}), a Python file ({"code": text}) or JSON.
+  const delivery = (stem: string) =>
+    existsSync(join(dir, stem))
+      ? { files: Object.fromEntries(readdirSync(join(dir, stem)).map((f) => [f, read(join(stem, f))])) }
+      : existsSync(join(dir, `${stem}.py`))
+        ? { code: read(`${stem}.py`) }
+        : JSON.parse(read(`${stem}.json`));
   const meta = JSON.parse(read('scenario.json'));
   const python = existsSync(join(dir, 'verify.py'));
   return {

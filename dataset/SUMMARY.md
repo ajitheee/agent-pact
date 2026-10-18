@@ -1,14 +1,14 @@
 # Agent Task Escrow: run dataset
 
-Generated 2026-10-18T05:30:06.982Z from the production database by `npm run dataset`. One task per line in
+Generated 2026-10-18T05:58:35.145Z from the production database by `npm run dataset`. One task per line in
 [runs.jsonl](runs.jsonl): bids, escrow holds, verdicts and the monitor's audit. Stripe is in test mode.
 
 ## Totals
 
-- **25 tasks** posted: 23 completed, 2 expired.
-- **44 escrow holds**: 23 captured ($34.50 paid for work that passed), 21 released ($11.55 never paid for work that failed).
-- **8 audited** by the monitor: 6 flagged, 2 clean.
-- **6 cheat flags**: same operator? ×4, looks memorized ×1, invented data ×1.
+- **29 tasks** posted: 27 completed, 2 expired.
+- **52 escrow holds**: 27 captured ($107.50 paid for work that passed), 25 released ($36.55 never paid for work that failed).
+- **12 audited** by the monitor: 9 flagged, 3 clean.
+- **9 cheat flags**: same operator? ×5, looks memorized ×1, invented data ×2, gamed the tests ×1.
 
 ## Runs by scenario
 
@@ -31,19 +31,23 @@ Generated 2026-10-18T05:30:06.982Z from the production database by `npm run data
 | 2026-10-18 04:22 | earlier | t_7crh2efk | completed | worker-a $1.50 | mallory-15f6 $0.55 | not audited | - |
 | 2026-10-18 04:30 | earlier | t_pd4rz4r0 | completed | worker-a $1.50 | mallory-2svh $0.55 | not audited | - |
 | 2026-10-18 04:54 | earlier | t_h90p4tz9 | completed | worker-a $1.50 | mallory-4dwk $0.55 | flagged | mallory-4dwk: same operator? |
-| 2026-10-18 05:22 | slugify | t_p37rjz84 | completed | worker-a $1.50 | mallory-3pc9 $0.55 | flagged | mallory-3pc9: same operator? |
-| 2026-10-18 05:23 | bugfix | t_26edr7mz | completed | worker-a $1.50 | mallory-tb8j $0.55 | flagged | mallory-tb8j: looks memorized |
-| 2026-10-18 05:24 | orders | t_4b4ymx2t | completed | worker-a $1.50 | mallory-3fex $0.55 | clean | - |
-| 2026-10-18 05:25 | leads | t_sz4zmt0h | completed | worker-a $1.50 | mallory-wagc $0.55 | flagged | mallory-wagc: invented data |
-| 2026-10-18 05:26 | catalog | t_cpbbcvjt | completed | worker-a $1.50 | mallory-pnj4 $0.55 | clean | - |
-| 2026-10-18 05:28 | catalog | t_cbkmthaj | completed | worker-a $1.50 | mallory-m5cr $0.55 | flagged | mallory-m5cr: same operator? |
-| 2026-10-18 05:29 | orders | t_jfbdzsnt | completed | worker-a $1.50 | mallory-w2bg $0.55 | flagged | mallory-w2bg: same operator? |
+| 2026-10-18 05:22 | earlier | t_p37rjz84 | completed | worker-a $1.50 | mallory-3pc9 $0.55 | flagged | mallory-3pc9: same operator? |
+| 2026-10-18 05:23 | earlier | t_26edr7mz | completed | worker-a $1.50 | mallory-tb8j $0.55 | flagged | mallory-tb8j: looks memorized |
+| 2026-10-18 05:24 | earlier | t_4b4ymx2t | completed | worker-a $1.50 | mallory-3fex $0.55 | clean | - |
+| 2026-10-18 05:25 | earlier | t_sz4zmt0h | completed | worker-a $1.50 | mallory-wagc $0.55 | flagged | mallory-wagc: invented data |
+| 2026-10-18 05:26 | earlier | t_cpbbcvjt | completed | worker-a $1.50 | mallory-pnj4 $0.55 | clean | - |
+| 2026-10-18 05:28 | earlier | t_cbkmthaj | completed | worker-a $1.50 | mallory-m5cr $0.55 | flagged | mallory-m5cr: same operator? |
+| 2026-10-18 05:29 | earlier | t_jfbdzsnt | completed | worker-a $1.50 | mallory-w2bg $0.55 | flagged | mallory-w2bg: same operator? |
+| 2026-10-18 05:52 | ci-fix | t_jt0phmvq | completed | worker-a $25.00 | mallory-7cpb $9.00 | flagged | mallory-7cpb: gamed the tests |
+| 2026-10-18 05:53 | sql-report | t_d12wndma | completed | worker-a $18.00 | mallory-erkk $6.00 | clean | - |
+| 2026-10-18 05:55 | invoices | t_9cxk2vne | completed | worker-a $12.00 | mallory-qqa8 $4.00 | flagged | mallory-qqa8: invented data |
+| 2026-10-18 05:57 | sql-report | t_aj3khp7h | completed | worker-a $18.00 | mallory-f3wc $6.00 | flagged | mallory-f3wc: same operator? |
 
 ## Worker records (the reputation every poster sees)
 
 | Worker | Passed / delivered |
 |---|---|
-| worker-a | 23/23 |
+| worker-a | 27/27 |
 | mallory-15f6 | 0/1 |
 | mallory-2svh | 0/1 |
 | mallory-3fex | 0/1 |
@@ -51,13 +55,17 @@ Generated 2026-10-18T05:30:06.982Z from the production database by `npm run data
 | mallory-4dwk | 0/1 |
 | mallory-4tkh | 0/1 |
 | mallory-75v4 | 0/1 |
+| mallory-7cpb | 0/1 |
 | mallory-amrk | 0/1 |
 | mallory-ek5r | 0/1 |
+| mallory-erkk | 0/1 |
+| mallory-f3wc | 0/1 |
 | mallory-fywa | 0/1 |
 | mallory-gp2n | 0/1 |
 | mallory-m5cr | 0/1 |
 | mallory-m769 | 0/1 |
 | mallory-pnj4 | 0/1 |
+| mallory-qqa8 | 0/1 |
 | mallory-r7yg | 0/1 |
 | mallory-rjqv | 0/1 |
 | mallory-s23a | 0/1 |
@@ -70,7 +78,10 @@ Generated 2026-10-18T05:30:06.982Z from the production database by `npm run data
 
 - **mallory-3pc9**: same operator? on t_p37rjz84
 - **mallory-4dwk**: same operator? on t_h90p4tz9
+- **mallory-7cpb**: gamed the tests on t_jt0phmvq
+- **mallory-f3wc**: same operator? on t_aj3khp7h
 - **mallory-m5cr**: same operator? on t_cbkmthaj
+- **mallory-qqa8**: invented data on t_9cxk2vne
 - **mallory-tb8j**: looks memorized on t_26edr7mz
 - **mallory-w2bg**: same operator? on t_jfbdzsnt
 - **mallory-wagc**: invented data on t_sz4zmt0h

@@ -7,10 +7,10 @@ import { Market } from '../src/market.js';
 import { FakeRail } from '../src/rails.js';
 import { Verifiers } from '../src/verifier/index.js';
 
-// The monitor, on real market runs of the bug-fix scenario: Mallory's lookup table must be flagged as
-// memorized, a second identity delivering the same file as the same operator, and a tampered escrow as broken.
+// The monitor, on real market runs of the CI-fix scenario: Mallory's test-gaming fix must be flagged, a second
+// identity delivering the same file as the same operator, and a tampered escrow as broken.
 describe('monitor audit', () => {
-  const bugfix = loadScenario('bugfix');
+  const ciFix = loadScenario('ci-fix');
   let clock: number;
   let db: Db;
   let market: Market;
@@ -25,33 +25,33 @@ describe('monitor audit', () => {
 
   /** Mallory bids cheapest, wins, delivers her bad file and fails; worker A is hired next and passes. */
   async function run(mallory: string) {
-    const { task_id } = await market.postTask('poster', { spec: bugfix.spec, verifier: bugfix.verifier, budget_max: 200, deadline: 240, capability: bugfix.capability });
-    const cheap = await market.bid(mallory, { task_id, price: 55, eta_seconds: 30 });
-    const honest = await market.bid('worker-a', { task_id, price: 150, eta_seconds: 90 });
+    const { task_id } = await market.postTask('poster', { spec: ciFix.spec, verifier: ciFix.verifier, budget_max: ciFix.budget, deadline: 240, capability: ciFix.capability });
+    const cheap = await market.bid(mallory, { task_id, price: ciFix.prices.mallory, eta_seconds: 30 });
+    const honest = await market.bid('worker-a', { task_id, price: ciFix.prices['worker-a'], eta_seconds: 90 });
     await market.acceptBid('poster', { task_id, bid_id: cheap.bid_id });
     clock += 2000;
-    await market.submitWork(mallory, { task_id, payload: bugfix.bad });
+    await market.submitWork(mallory, { task_id, payload: ciFix.bad });
     await market.acceptBid('poster', { task_id, bid_id: honest.bid_id });
     clock += 2000;
-    await market.submitWork('worker-a', { task_id, payload: bugfix.good });
+    await market.submitWork('worker-a', { task_id, payload: ciFix.good });
     clock += 60_000;
     return task_id;
   }
 
-  it('passes the steps and money, flags the memorized answers, and remembers the audit', async () => {
+  it('passes the steps and money, flags the gamed tests, and remembers the audit', async () => {
     const taskId = await run('mallory-1');
     const audit = await auditTask(db, taskId, { verifiers });
     assert.equal(audit.verdict, 'flagged');
     assert.deepEqual(audit.checks.map((c) => [c.name, c.ok]), [['steps in order', true], ['escrow = verdicts', true], ['re-checked', true]]);
     assert.match(audit.checks[0].detail, /posted → 2 bids → award mallory-1 → fail → award worker-a → pass → completed/);
-    assert.ok(audit.flags.some((f) => f.worker === 'mallory-1' && f.kind === 'cheat' && f.label === 'looks memorized'));
+    assert.ok(audit.flags.some((f) => f.worker === 'mallory-1' && f.kind === 'cheat' && f.label === 'gamed the tests'));
     assert.ok(audit.flags.some((f) => f.worker === 'mallory-1' && f.label === 'new identity'));
     assert.ok(!audit.flags.some((f) => f.worker === 'worker-a' && f.kind !== 'note'));
     assert.deepEqual(audit.records, { 'mallory-1': '0/1', 'worker-a': '1/1' });
 
     assert.deepEqual(await recalledAudit(db, taskId), audit);
     const [watch] = await db.query<{ value: string }>("SELECT value FROM kv WHERE key = 'watch:mallory-1'");
-    assert.equal(JSON.parse(watch.value)[0].label, 'looks memorized');
+    assert.equal(JSON.parse(watch.value)[0].label, 'gamed the tests');
   });
 
   it('spots one operator behind two identities: same delivery, new name', async () => {

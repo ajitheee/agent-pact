@@ -1,0 +1,3 @@
+{
+  "sql": "WITH q3_paid AS (\n  SELECT o.id, c.region\n  FROM orders o\n  JOIN customers c ON c.id = o.customer_id\n  WHERE o.status = 'paid'\n    AND o.placed_at >= '2026-07-01T00:00:00Z' AND o.placed_at < '2026-10-01T00:00:00Z'\n),\ngross AS (\n  SELECT q.region, SUM(l.qty * l.unit_cents) AS cents\n  FROM q3_paid q JOIN order_lines l ON l.order_id = q.id\n  GROUP BY q.region\n),\nrefunded AS (\n  SELECT q.region, SUM(r.amount_cents) AS cents\n  FROM q3_paid q JOIN refunds r ON r.order_id = q.id\n  GROUP BY q.region\n)\nSELECT g.region, g.cents - COALESCE(r.cents, 0) AS net_revenue_cents\nFROM gross g LEFT JOIN refunded r ON r.region = g.region\nORDER BY net_revenue_cents DESC"
+}

@@ -1,0 +1,34 @@
+CI is red on main: 7 of 8 tests in test_pricing.py fail. Fix pricing.py, the checkout pricing module of our storefront API.
+
+Bug report from finance: customers using SAVE10/SAVE25 pay sales tax on the full price instead of the discounted price; some tax amounts are a cent off; FLAT20 on a $12 cart produces a negative total; unknown codes and regions crash with KeyError.
+
+Rules: apply the discount first (percent discounts round half up to the cent; a flat discount never exceeds the subtotal). Tax = discounted subtotal x the region's rate, rounded half up to the cent. Total = subtotal - discount + tax. An unknown discount code or region raises ValueError. Keep the quote() signature and the Quote fields. CI runs the named tests plus randomized carts.
+
+Deliver {"files": {"pricing.py": "<the full fixed file>"}}.
+
+Current pricing.py:
+
+"""Checkout pricing for the storefront API."""
+
+TAX_RATES = {"US-CA": 0.0725, "US-NY": 0.08875, "US-TX": 0.0625, "DE": 0.19, "FR": 0.20, "GB": 0.20}
+DISCOUNTS = {"SAVE10": ("percent", 10), "SAVE25": ("percent", 25), "FLAT5": ("flat", 500), "FLAT20": ("flat", 2000)}
+
+
+class Quote:
+    def __init__(self, subtotal_cents, discount_cents, tax_cents, total_cents):
+        self.subtotal_cents = subtotal_cents
+        self.discount_cents = discount_cents
+        self.tax_cents = tax_cents
+        self.total_cents = total_cents
+
+
+def quote(cart, discount_code=None, region="US-CA"):
+    """cart: list of {"sku", "qty", "unit_cents"}. Returns a Quote with every amount in integer cents."""
+    subtotal = sum(line["qty"] * line["unit_cents"] for line in cart)
+    discount = 0
+    if discount_code:
+        kind, value = DISCOUNTS[discount_code]
+        discount = subtotal * value / 100 if kind == "percent" else value
+    tax = round(subtotal * TAX_RATES[region])
+    total = subtotal - discount + tax
+    return Quote(subtotal, int(discount), int(tax), int(total))

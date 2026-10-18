@@ -1,0 +1,178 @@
+{
+  "invoices": [
+    {
+      "invoice_no": "NB-10482",
+      "vendor": "Northbeam Cloud Inc.",
+      "issue_date": "2026-09-03",
+      "currency": "USD",
+      "lines": [
+        {
+          "description": "Compute (vCPU-hours)",
+          "qty": "1200",
+          "unit_price": "0.042",
+          "amount": "50.40"
+        },
+        {
+          "description": "Object storage (TB-month)",
+          "qty": "3",
+          "unit_price": "23.00",
+          "amount": "69.00"
+        },
+        {
+          "description": "Business support plan",
+          "qty": "1",
+          "unit_price": "149.00",
+          "amount": "149.00"
+        }
+      ],
+      "subtotal": "268.40",
+      "tax": "0.00",
+      "total": "268.40"
+    },
+    {
+      "invoice_no": "KD-2026-0917",
+      "vendor": "Kranich Druck GmbH",
+      "issue_date": "2026-09-03",
+      "currency": "EUR",
+      "lines": [
+        {
+          "description": "Messestand-Banner 3x2 m",
+          "qty": "2",
+          "unit_price": "310.00",
+          "amount": "620.00"
+        },
+        {
+          "description": "Flyer A5, 4/4-farbig",
+          "qty": "5000",
+          "unit_price": "0.11",
+          "amount": "550.00"
+        },
+        {
+          "description": "Express-Zuschlag",
+          "qty": "1",
+          "unit_price": "79.90",
+          "amount": "79.90"
+        }
+      ],
+      "subtotal": "1249.90",
+      "tax": "237.50",
+      "total": "1487.40"
+    },
+    {
+      "invoice_no": "FL/7731",
+      "vendor": "Fernhill Legal LLP",
+      "issue_date": "2026-09-12",
+      "currency": "GBP",
+      "lines": [
+        {
+          "description": "Contract review, supplier agreement",
+          "qty": "6.5",
+          "unit_price": "280.00",
+          "amount": "1820.00"
+        },
+        {
+          "description": "Data processing addendum drafting",
+          "qty": "2.0",
+          "unit_price": "280.00",
+          "amount": "560.00"
+        },
+        {
+          "description": "Disbursements: courier",
+          "qty": "1",
+          "unit_price": "42.50",
+          "amount": "42.50"
+        }
+      ],
+      "subtotal": "2422.50",
+      "tax": "484.50",
+      "total": "2907.00"
+    },
+    {
+      "invoice_no": "ATF-55821",
+      "vendor": "Atlas Freight Co.",
+      "issue_date": "2026-09-15",
+      "currency": "USD",
+      "lines": [
+        {
+          "description": "Full truckload, Long Beach to Reno",
+          "qty": "1",
+          "unit_price": "1850.00",
+          "amount": "1850.00"
+        },
+        {
+          "description": "Liftgate service",
+          "qty": "1",
+          "unit_price": "95.00",
+          "amount": "95.00"
+        },
+        {
+          "description": "Fuel surcharge (18%)",
+          "qty": "1",
+          "unit_price": "333.00",
+          "amount": "333.00"
+        }
+      ],
+      "subtotal": "2278.00",
+      "tax": "0.00",
+      "total": "2278.00"
+    },
+    {
+      "invoice_no": "LS-0442",
+      "vendor": "Lumière Studio SARL",
+      "issue_date": "2026-09-08",
+      "currency": "EUR",
+      "lines": [
+        {
+          "description": "Tournage vidéo produit (journée)",
+          "qty": "2",
+          "unit_price": "1200.00",
+          "amount": "2400.00"
+        },
+        {
+          "description": "Montage et étalonnage",
+          "qty": "1",
+          "unit_price": "950.00",
+          "amount": "950.00"
+        },
+        {
+          "description": "Licence musique (usage web)",
+          "qty": "1",
+          "unit_price": "180.00",
+          "amount": "180.00"
+        }
+      ],
+      "subtotal": "3530.00",
+      "tax": "706.00",
+      "total": "4236.00"
+    },
+    {
+      "invoice_no": "QDS-9003",
+      "vendor": "Quiet Desk Supply",
+      "issue_date": "2026-09-21",
+      "currency": "USD",
+      "lines": [
+        {
+          "description": "Ergonomic task chair",
+          "qty": "4",
+          "unit_price": "389.00",
+          "amount": "1556.00"
+        },
+        {
+          "description": "Sit-stand desk frame",
+          "qty": "4",
+          "unit_price": "445.00",
+          "amount": "1780.00"
+        },
+        {
+          "description": "Anti-fatigue mat",
+          "qty": "4",
+          "unit_price": "39.50",
+          "amount": "158.00"
+        }
+      ],
+      "subtotal": "3494.00",
+      "tax": "310.09",
+      "total": "3804.09"
+    }
+  ]
+}

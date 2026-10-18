@@ -1,0 +1,3 @@
+{
+  "sql": "SELECT c.region,\n       SUM(l.qty * l.unit_cents) - COALESCE(SUM(r.amount_cents), 0) AS net_revenue_cents\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nJOIN order_lines l ON l.order_id = o.id\nLEFT JOIN refunds r ON r.order_id = o.id\nWHERE o.status = 'paid'\n  AND o.placed_at >= '2026-07-01' AND o.placed_at < '2026-10-01'\nGROUP BY c.region\nORDER BY net_revenue_cents DESC"
+}
