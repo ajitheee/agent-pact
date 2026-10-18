@@ -8,7 +8,7 @@
 :root { --bg:#060a13; --panel:#0b1220; --panel2:#0f182b; --line:#1a2640; --text:#e8eef9; --muted:#7b89a6; --violet:#a78bfa; --teal:#2dd4bf; --red:#f87171; --gold:#fbbf24; --green:#34d399; --cyan:#38bdf8; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Inter, sans-serif; }
-body { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; overflow: hidden; }
+body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; overflow: hidden; }
 header { display: flex; align-items: center; gap: 22px; padding: 12px 22px; border-bottom: 1px solid var(--line); }
 .brand b { font-size: 19px; letter-spacing: .2px; }
 .brand em { display: block; font-style: normal; color: var(--muted); font-size: 12.5px; }
@@ -56,7 +56,7 @@ footer .label { color: var(--muted); font-size: 11px; letter-spacing: .1em; text
   .brand em { display: none; }
   .kpis { margin-left: 0; width: 100%; flex-wrap: wrap; }
   .kpi { min-width: 0; flex: 1 1 40%; }
-  main { grid-template-columns: 1fr; }
+  main { grid-template-columns: minmax(0, 1fr); }
   #stage { height: 62vw; min-height: 300px; }
   aside { border-left: 0; border-top: 1px solid var(--line); }
   .feed { max-height: 40vh; }
@@ -516,7 +516,10 @@ window.focusRect = (name) => {
   }[name];
 };
 
-if (!STUDIO) {
+// Public replay page (built by scripts/replay-page.ts): the recorded runs are baked in and there is no live stream.
+const PUBLIC = Boolean(window.REPLAY);
+if (PUBLIC) setMode('replay');
+if (!STUDIO && !PUBLIC) {
   const stream = new EventSource('/api/stream');
   stream.onopen = () => setMode(replayToken ? 'replay' : 'waiting');
   stream.onerror = () => { $('mode').textContent = 'reconnecting…'; $('dot').className = 'dot'; };
@@ -532,7 +535,7 @@ if (!STUDIO) {
 }
 
 setInterval(() => { if (task) { const s = Math.max(0, Math.round((Date.now() - t0) / 1000)); $('clock').textContent = $('mode').textContent === 'live' ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} since posting` : ''; } }, 1000);
-refresh().then(() => { const r = new URLSearchParams(location.search).get('replay'); if (r) replay(r); });
+refresh().then(() => { const r = new URLSearchParams(location.search).get('replay') ?? (PUBLIC ? window.REPLAY.featured : null); if (r) replay(r); });
 </script>
 </body>
 </html>

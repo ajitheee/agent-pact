@@ -20,7 +20,8 @@
     "audit": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/audit.ts",
     "rehearse": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/rehearse.ts",
     "dataset": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/dataset.ts",
-    "dashboard": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/dashboard.ts"
+    "dashboard": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/dashboard.ts",
+    "replay-page": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/replay-page.ts"
   },
   "keywords": [],
   "author": "",
