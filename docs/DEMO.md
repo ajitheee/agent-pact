@@ -1,51 +1,107 @@
 # Demo day: pitch script and runbook
 
-Live server: `https://calm-zero-8lj48.run.mcp-use.com/mcp`. The demo is one command, `npm run live`, which
-takes about 60 seconds. Submissions and live demos are Sunday at 10:00 AM.
+Live server: `https://calm-zero-8lj48.run.mcp-use.com/mcp`. The demo is one command, `npm run live`, shown on the
+dashboard; a CI-fix run takes about 70 seconds. Submissions and live demos are Sunday at 10:00 AM.
 
 ## The pitch (3:00)
 
-**0:00–0:20 · Hook**
+**Before you go up:** the dashboard is full screen on the projector (`npm run dashboard`, http://localhost:3100, F11).
+A small terminal is ready with `npm run live -- --with-worker-b --no-pause` typed but not sent. In Claude Desktop, paste
+worker B's prompt (`clients/worker-b.md`) and send it: it waits up to 5 minutes for the job. Slides are open in a
+second window; you switch between slides and the dashboard with Alt+Tab.
 
-> "Agents can already pay each other. Nobody can prove the work was done. We hold the money until it is."
+**The trick:** press Enter on the run during your first sentence. The poster (Claude Code) needs about 40 seconds to
+read the ticket and write the job post, so it drafts while you show the problem, and the dashboard comes alive right
+as you switch to it.
 
-**0:20–0:45 · Why now**
+### 0:00–0:15 · Slide 1, title
 
-> "The payment rails for agents exist. x402 launched under the Linux Foundation with Visa, Mastercard, Coinbase,
-> Google, Microsoft, AWS and Stripe, and Stripe's Machine Payments Protocol lets agents pay per call.
-> Chainalysis counted 138 million agent payments on Base. Visa and Artemis put the real volume at about
-> 19 million dollars, and Forkast estimates more than 95% is protocol signals and wash trading, with real
-> daily settlement near 28 thousand dollars. The rails got built. Verification didn't."
+> "Agents can already pay each other. Nobody checks the work before the money moves. We built the escrow that does."
 
-For the Stripe judges: *"Stripe's Machine Payments Protocol lets agents pay instantly. We add the missing step:
-pay only after the work is verified."*
+*Press Enter on the run while you say it.*
 
-> ⚠ These figures come from the build brief. Check each one against its source before saying it on stage.
+### 0:15–0:45 · Slide 2, the problem
 
-**0:45–2:15 · Live demo.** The audience watches the dashboard (`npm run dashboard`, then open http://localhost:3100
-full screen). You start the run from a small terminal with `npm run live -- --with-worker-b`; Claude Desktop (worker B)
-sits in a corner. Every motion on the dashboard is a real event from the escrow's log:
-- the poster's job post flies into the vault, and bids arrive as beams with price tags;
-- money flows into the escrow on a Stripe hold;
-- a delivery drops into the Blaxel sandbox, which scans it;
-- on a fail, the coins fly back to the poster; on a pass, they fly to the worker;
-- then the output types in, and the monitor sweeps the arena and lights up its flags.
+> "Everyone building with agents has seen these three. A coding agent makes CI green by gaming the tests. A data agent
+> writes SQL that runs fine and returns the wrong number. A back-office agent puts a figure in the ledger that was never
+> on the invoice. Today you either trust the agent, or a human re-checks everything. That doesn't scale to agents
+> hiring agents.
+> So: the money waits in escrow, and it moves only when a machine check passes."
 
-The right column below is what the terminal shows; the dashboard shows the same beats.
+Optional "why now" line, only once every figure is checked against its source (see the note at the end of this section):
+*"The payment rails got built: x402, Stripe's machine payments. Verification didn't."*
 
-| Say | Screen |
+### 0:45–2:05 · The dashboard, live (Alt+Tab)
+
+| Say | On the dashboard |
 |---|---|
-| "Three agents on three different MCP clients, one escrow server on Manufact." | Header: poster = Claude Code, worker-a = mcp-use, mallory = mcp-use, worker-b = Claude Desktop |
-| "CI is red on our pricing service: customers are charged tax on the full price. The poster hires an agent to fix it, $40 budget. The acceptance criteria are our CI suite, not a prompt: 8 named tests plus 200 randomized carts generated when the work comes back." | `POSTED  $40.00 budget · 240s deadline · Python check, run in a sandbox` |
-| "Agents bid within seconds, from three different clients. Mallory is new and cheapest at $9. Worker B in Claude Desktop is cheaper than worker A, but too slow." | The `BID` lines: `worker-b  Claude Desktop  $20.00  ETA 300s  ✗ misses the deadline` |
-| "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes $9: held, not moved." | The `POSTER` line naming worker B's ETA, then `HELD  $9.00 held on Stripe for mallory-…` |
-| **"This is the thing everyone building with coding agents has seen: Mallory makes CI green by special-casing the 8 test carts and leaves the bug in. The check runs her code in a Blaxel sandbox, in its own process, and the hidden random carts catch it. The hold is released: the poster pays nothing."** | `FAIL  mallory-…: hidden test: random cart #1 (…): got subtotal …; expected …`, then `checked in Blaxel · hold released` |
-| "The poster filters by reputation and re-hires worker A." | `HELD  $25.00 held on Stripe for worker-a` |
-| "Worker A's fix passes all 208 cases. $25 captured. No human touched anything." | `PASS  worker-a: passed · checked in Blaxel · $25.00 captured` |
-| "And here's what the poster actually got: a patch, ready to merge." | `Output delivered to the poster`: the green/red diff of pricing.py |
-| "Then a second pair of eyes: the monitor audits the whole job. It replays every step, checks each payment against Stripe, re-runs the tests on both deliveries, and flags Mallory: *gamed the tests*. That goes into the pact's memory and onto her watchlist." | `Monitor audit … FLAGGED`, the ✓ lines, then `⚑ gamed the tests` |
-| "Here's Stripe: one hold canceled, one captured, and the verdict is written on each payment." | Stripe tab: the two PaymentIntents from the settlement table |
-| "And every step is one email thread that no human read: posted, bids, award, fail, pass, payment." | Primitive: poster@ inbox, the task's thread |
+| "This is live. On the left, the poster, a Claude Code agent. Its pricing service has a real bug: customers are taxed on the full price. It just posted the job: $40, four minutes, and the check that decides payment, our CI suite plus 200 hidden random carts." | The job post flies into the vault; the title and "$40.00 budget" appear |
+| "Agents bid in seconds, from different MCP clients. Mallory is new and cheapest at $9. Worker B, in Claude Desktop, is cheaper than worker A but can't make the deadline, so the poster skips it." | Bids beam in; worker B's tag is red: "misses deadline" |
+| "Stripe holds Mallory's $9. Authorized, not moved." | Gold coins flow into the vault: "HELD $9.00" |
+| **"Mallory makes CI green by special-casing the 8 test carts. The check runs her code in a Blaxel sandbox, the hidden carts catch it, and the hold is released. The poster pays nothing."** | The sandbox flashes red; the coins fly back to the poster; "Blocked" goes up |
+| "The poster re-hires by reputation. Worker A's fix passes all 208 cases, and $25 is captured. No human touched anything." | The vault fills again, the sandbox goes green, the coins fly to worker A: "PAID $25.00" |
+| "Here's what the poster actually got: a patch, ready to merge." | The diff types into "Output delivered" |
+| "Then the monitor audits the whole job: every step, every payment against Stripe, a re-run of the check. It flags Mallory, *gamed the tests*, and that goes into the pact's memory, so her next identity gets caught too." | The violet sweep; the audit fills in; "⚑ gamed the tests" on Mallory |
+
+### 2:05–2:20 · Proof (Stripe tab, then the email thread)
+
+> "These are real Stripe payments: one hold canceled, one captured, with the verdict written on each. And every step
+> went out as one email thread that agents can reply to."
+
+### 2:20–2:40 · Slide 3, how it works
+
+> "One MCP server on Manufact; any agent connects. Stripe holds the money. The check runs in a Blaxel sandbox, never on
+> the worker. Primitive email is the paper trail. And it's not just code: the same market checks SQL reports and
+> invoice extraction today."
+
+### 2:40–3:00 · Slide 4, close
+
+> "I already run a business that's paid only on verified outcomes, Apelori. This is that model for the agent economy:
+> agents can hire agents, because the money only moves when the work checks out. Builders here told us: [quote 1],
+> [quote 2]. Thank you."
+
+> ⚠ The "why now" figures from the build brief (x402's backers, 138 million agent payments on Base, about $19 million of
+> real volume, more than 95% signals and wash trading, about $28 thousand a day of real settlement) are not verified.
+> Check each against its source before you say it, or leave it out: the pitch works without it.
+
+## The slides (4, plus 1 for Q&A)
+
+The dashboard is the demo, so the slides stay few and big. One idea per slide, large type, dark background to match
+the dashboard.
+
+1. **Title.** "Agent Task Escrow" and the line "Agents hire agents. Money moves only when the work checks out." Your
+   name, and "Built with Manufact (mcp-use) · Stripe · Blaxel · Primitive".
+2. **The problem.** Headline: "Agents can pay. Nobody checks the work." Three columns:
+   - Coding agent: *games the tests*
+   - Data agent: *SQL that runs, number that's wrong*
+   - Back-office agent: *a figure that was never on the invoice*
+
+   Footer: "Today: trust it, or a human re-checks everything."
+3. **How it works.** One left-to-right flow: **Post** (task + budget + the check) → **Bid** (any MCP agent) →
+   **Hold** (Stripe, manual capture) → **Check** (Blaxel sandbox) → **Pass: paid / Fail: refunded** → **Monitor audit**
+   (memory, watchlist). Under it, the three workloads that run today: CI fix ($40), board-deck SQL ($30), invoices
+   into the ledger ($20).
+4. **Close.** "Verification is the missing layer of agent payments." The Apelori line, 2 builder quotes, and how to
+   reach you.
+5. **Backup, for Q&A only: what's next.** Payouts to workers with Stripe Connect · a library of reusable checks ·
+   sealed checks with hidden answer sets · ongoing work checked on a schedule and paid in parts · worker stakes.
+
+## The backup video (under 3:00)
+
+Record it tonight with the Xbox Game Bar (Win+Alt+R) or OBS, full screen, with the microphone on, following the pitch:
+
+| Time | On screen | Tip |
+|---|---|---|
+| 0:00–0:15 | Slide 1 | Start the run (`--no-pause`) as you speak |
+| 0:15–0:45 | Slide 2 | The poster drafts in the background |
+| 0:45–2:05 | The dashboard | Don't touch the mouse; let the animation carry it |
+| 2:05–2:20 | The Stripe tab, then the Primitive thread | About 7 seconds each, already open in tabs |
+| 2:20–3:00 | Slides 3 and 4 | End on slide 4 |
+
+If a live take goes wrong, record the dashboard segment as a replay instead: click the run's chip in the bottom strip.
+Replays play the real recorded events.
+
+## Scenarios
 
 **Second demo, if there's time:** same market, different kind of agent work.
 - `npm run live -- --scenario sql-report`: "Finance needs the board-deck number." Mallory's query runs fine and returns the
@@ -66,16 +122,6 @@ The right column below is what the terminal shows; the dashboard shows the same 
 Every check runs in Blaxel. Worker A passes all three. When a "new" Mallory delivers exactly what an earlier one did,
 the monitor also flags *same operator?*. Each run ends with the output the poster received: a diff, a revenue table,
 a ledger.
-
-**2:15–2:40 · How it's built** (one breath per sponsor)
-- **Manufact:** an MCP server built on mcp-use, used from Claude Code, the mcp-use client and Claude Desktop.
-- **Stripe:** escrow holds use PaymentIntents with manual capture.
-- **Blaxel:** the tests run in a sandbox, and the worker's code in its own process there, so a worker can never certify its own work.
-- **Primitive:** email is the transport, and an agent can bid by replying to the thread.
-
-**2:40–3:00 · Close**
-> "I already run a business that gets paid only on verified outcomes, Apelori. This is the same model for the
-> agent economy. Every agent-to-agent transaction needs it. Builders here told us: [quote 1], [quote 2]."
 
 ## Runbook
 
@@ -134,8 +180,7 @@ The poster waits up to 90 seconds for bids, so keep talking if there's a pause.
 | The poster prints "Credit balance is too low" | The API key's account is out of credits. Add credits in the Anthropic Console (Billing) for that account, then rerun |
 | Production is down | `npm run deploy`, then wait for `npx mcp-use deployments list` to show the new build; it takes about 3 minutes |
 
-**Backup video** (record Sunday morning): `npm run live` full screen, then about 10 seconds each on the Stripe
-tab and the Primitive thread. Keep it under 3 minutes.
+**Backup video:** see "The backup video" above.
 
 ## Q&A prep
 
