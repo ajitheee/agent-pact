@@ -100,6 +100,21 @@ export class FakeRail implements Rail {
   }
 }
 
+/**
+ * Base URL for dashboard links to this key's payments. A Stripe sandbox is its own account, so the link names it:
+ * a bare /test/payments/pi_… opens whichever account the browser last used and answers "not found".
+ */
+export async function stripeDashboardBase(secretKey = config.stripeKey): Promise<string> {
+  try {
+    const res = await fetch('https://api.stripe.com/v1/account', { headers: { authorization: `Bearer ${secretKey}` } });
+    const { id } = (await res.json()) as { id?: string };
+    if (id) return `https://dashboard.stripe.com/${id}/test`;
+  } catch {
+    /* restricted key or offline: fall back to the account-less link */
+  }
+  return 'https://dashboard.stripe.com/test';
+}
+
 export function railFromEnv(): Rail {
   if (config.stripeKey) return new StripeRail(config.stripeKey, config.stripePaymentMethod);
   console.warn('[escrow] STRIPE_SECRET_KEY not set: using the in-memory fake rail. Set an sk_test_ key to hold real Stripe test-mode funds.');

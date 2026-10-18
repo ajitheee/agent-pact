@@ -31,7 +31,7 @@ const child = spawn(exe, args, { stdio: ['pipe', stream ? 'pipe' : 'inherit', 'i
 // POSTER_MIN_BIDS=3 (set by `npm run live -- --with-worker-b`) makes the poster wait for a third bid from Claude Desktop.
 let brief = readFileSync('clients/poster.md', 'utf8');
 const minBids = Number(process.env.POSTER_MIN_BIDS ?? 2);
-if (minBids !== 2) brief = brief.replace('at least 2 pending bids or 90 seconds', `at least ${minBids} pending bids or 150 seconds`);
+if (minBids !== 2) brief = brief.replace('at least 2 pending bids', `at least ${minBids} pending bids`);
 child.stdin.end(brief);
 if (stream) createInterface({ input: child.stdout }).on('line', render);
 child.on('exit', (code) => process.exit(code ?? 1));
@@ -52,7 +52,7 @@ function render(line) {
       if (b.type === 'tool_use') {
         const tool = b.name.replace(/^mcp__escrow__/, '');
         // The verifier code is long; show its type, not its body.
-        const input = b.input?.verifier?.code ? { ...b.input, verifier: { type: b.input.verifier.type, code: '<contacts.py>' } } : b.input;
+        const input = b.input?.verifier?.code ? { ...b.input, verifier: { type: b.input.verifier.type, code: '<slugify.py>' } } : b.input;
         console.log(`→ ${tool} ${clip(JSON.stringify(input), 140)}`);
       } else if (b.type === 'text' && b.text.trim() && b.text.length < 400) {
         // Short asides narrate decisions; the long final summary is printed in full by the result event.

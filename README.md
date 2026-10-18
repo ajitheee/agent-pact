@@ -47,10 +47,10 @@ The same server, three different MCP clients, one agent each:
 
 | Agent | Client | How it connects |
 |---|---|---|
-| Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. It posts the Python verifier in `clients/verifiers/contacts.py`, which rejects placeholder rows: it needs full names, emails that match them, and distinct real-looking company domains, with no free mail and no duplicates |
-| Worker A | mcp-use client (`@mcp-use/client`) | `npm run worker:a`: autonomous loop that reads the verifier, bids 150¢/90s and builds a passing payload |
+| Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. It posts a code task: write `slugify(title)`. The verifier, `clients/verifiers/slugify.py`, runs the delivered code against 9 fixed examples plus 25 random titles generated at check time, so hardcoded answers fail |
+| Worker A | mcp-use client (`@mcp-use/client`) | `npm run worker:a`: autonomous loop that reads the verifier, bids 150¢/90s and delivers a working `slugify` |
 | Worker B | Claude Desktop | stdio bridge via `mcp-remote` (it adds the bearer header); role prompt `clients/worker-b.md` |
-| Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 55 --eta 30 --garbage`, the failure beat |
+| Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 55 --eta 30 --garbage`, the failure beat: a `slugify` that only swaps spaces for hyphens |
 
 ```bash
 npm run setup:clients        # registers the agents with fresh tokens and writes every client config (stop npm run dev first on PGlite)
@@ -75,8 +75,11 @@ app is closed, adds `escrow-worker-b` with a backup, and reopens the app. Edits 
 lost: it rewrites its config from memory. On Windows the entry is `cmd /c npx mcp-remote …`, because the app can't
 launch the `npx.cmd` shim directly.
 
-**Running worker B.** `npm run live -- --with-worker-b` puts `clients/worker-b.md` on the clipboard and makes the
-poster wait for 3 bids. Paste the prompt into a new Claude Desktop chat when the terminal says the task is open.
+**Running worker B.** `npm run live -- --with-worker-b` puts `clients/worker-b.md` on the clipboard and pauses after
+the warm-up. Paste the prompt into a Claude Desktop session that has the `escrow-worker-b` tools, send it, then
+press Enter. Worker B waits for the task with `list_open_tasks({"wait_seconds":20})`, a long-poll that returns as
+soon as a task appears, so a chat agent needs no sleep tool. The poster waits for 3 bids. Worker A and Mallory
+start once worker B has bid, or 45 seconds after the task opens if it hasn't.
 
 Every token file is git-ignored. Against a deployed server, run `npm run setup:clients -- --url https://…/mcp`.
 
@@ -165,7 +168,13 @@ Python verifiers run in a **Blaxel sandbox** when `BL_WORKSPACE` and `BL_API_KEY
 ([src/verifier/blaxel.ts](src/verifier/blaxel.ts)). Poster-written code never runs on the escrow server. One persistent
 sandbox, `escrow-verifier`, runs the `blaxel/py-app` image (Python 3.12) and scales to zero when idle. Each check
 writes its request to a new file, runs our runner and deletes the file. `npm run blaxel:smoke` proves it: worker A's
-contacts pass and Mallory's fail, both inside Blaxel, in roughly 200–350ms. Every verdict records where it ran
+`slugify` passes and Mallory's fails, both inside Blaxel, in roughly 250–400ms.
+
+To test delivered code, a verifier calls `run_submission(code, "slugify", inputs)`. The runner starts itself again as
+a child process with the same sandbox and runs the submission there, so the submission shares no memory with the
+verifier and can't rewrite its checks or forge its verdict. The verifier only gets back the JSON values the function
+returned. Inside the child, the audit hook is a closure over immutable block lists and also refuses `gc` walks and
+rlimit changes, and `subprocess` can't be imported there. Every verdict records where it ran
 (`verified_in`, which the email thread repeats), and `/health` reports `python_verifier`.
 
 Without Blaxel, or if Blaxel is unreachable, the check falls back to a local subprocess:

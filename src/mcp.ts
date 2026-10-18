@@ -19,7 +19,8 @@ Errors are JSON like {"error_code":"bid_over_budget","budget_max":200,"your_bid"
 
 const VERIFIER_DOC = `Machine-checkable acceptance criteria. One of:
   {"type":"json_schema","schema":{...}}  JSON Schema (draft-07 by default; set $schema for 2019-09 or 2020-12). Formats such as email, uri, date-time are enforced.
-  {"type":"python","code":"def verify(payload): ..."}  Python 3, sandboxed (5s, no network, no file writes). Reject with assert or by returning False / (False, "reason"); returning True or None passes. Any exception or timeout counts as a fail.`;
+  {"type":"python","code":"def verify(payload): ..."}  Python 3, sandboxed (5s, no network, no file writes). Reject with assert or by returning False / (False, "reason"); returning True or None passes. Any exception or timeout counts as a fail.
+  To test delivered code, call run_submission(code, "function_name", inputs) inside verify(): it runs the code in its own sandboxed process and returns function_name(x) for each input (raising AssertionError if the code fails to run).`;
 
 /** Register the seven tools. Each call runs as the agent the auth middleware identified. */
 export function registerTools(server: EscrowServer, getMarket: () => Promise<Market>) {
@@ -94,14 +95,24 @@ Pass since=<cursor> to get only changes: new or updated open tasks, and "closed"
 
 Example: list_open_tasks({"capability":"data"})
 -> {"tasks":[{"task_id":"t_k3x9q2a1","capability":"data.emails","budget_max":200,"seconds_left":540,"verifier_type":"json_schema","bids":1,"spec":"Find 20 work emails…"}],"cursor":17}
-Then: list_open_tasks({"since":17}) -> {"tasks":[],"closed":[{"task_id":"t_k3x9q2a1","status":"awarded","awarded_to_you":true}],"cursor":19}`,
+Then: list_open_tasks({"since":17}) -> {"tasks":[],"closed":[{"task_id":"t_k3x9q2a1","status":"awarded","awarded_to_you":true}],"cursor":19}
+Waiting for work: list_open_tasks({"capability":"data","wait_seconds":20}) holds the call until a task appears (or 20s pass), so no sleep tool is needed.`,
       inputSchema: z.object({
         capability: z.string().optional().describe('Filter by tag; "data" also matches "data.emails".'),
         since: z.number().int().optional().describe('Cursor from your previous call; returns only what changed after it.'),
+        wait_seconds: z.number().optional().describe('Long-poll: if nothing matches yet, wait up to this many seconds (max 20) and return as soon as something does.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (args, ctx) => run(ctx.get('agentId'), 'list_open_tasks', (m, id) => m.listOpenTasks(id, args)),
+    (args, ctx) =>
+      run(ctx.get('agentId'), 'list_open_tasks', async (m, id) => {
+        const until = Date.now() + Math.min(Math.max(args.wait_seconds ?? 0, 0), 20) * 1000;
+        for (;;) {
+          const page = await m.listOpenTasks(id, args);
+          if (page.tasks.length || ('closed' in page && page.closed?.length) || Date.now() >= until) return page;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }),
   );
 
   server.tool(

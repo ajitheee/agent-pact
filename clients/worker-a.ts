@@ -3,18 +3,19 @@
 // that satisfies the verifier, then submits. No human in the loop.
 //
 //   npm run worker:a                      honest worker, bids 150 cents / 90 s
-//   npm run worker:a -- --as mallory --price 55 --eta 30 --garbage   the failure beat: real names, free-mail addresses
+//   npm run worker:a -- --as mallory --price 55 --eta 30 --garbage   the failure beat: code that only looks finished
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { MCPClient } from '@mcp-use/client';
 import { deliverable, garbage } from './contacts.js';
+import { brokenSlugify, isSlugifyTask, slugifyDeliverable } from './slugify.js';
 
 const { values: opts } = parseArgs({
   options: {
     as: { type: 'string', default: 'worker-a' },
     price: { type: 'string', default: '150' },
     eta: { type: 'string', default: '90' },
-    capability: { type: 'string', default: 'data' },
+    capability: { type: 'string', default: 'code' },
     garbage: { type: 'boolean', default: false },
     once: { type: 'boolean', default: false }, // exit after the first settled task
   },
@@ -78,7 +79,9 @@ for (;;) {
     if (!c.awarded_to_you) continue;
     const task = await call('get_task', { task_id: c.task_id });
     log(`awarded ${c.task_id}; escrow ${task.escrow?.payment_intent} held. Building the deliverable${opts.garbage ? ' (garbage)' : ''}…`);
-    const payload = opts.garbage ? garbage() : deliverable(task.verifier);
+    const payload = isSlugifyTask(task.verifier)
+      ? opts.garbage ? brokenSlugify() : slugifyDeliverable()
+      : opts.garbage ? garbage() : deliverable(task.verifier);
     try {
       const verdict = await call('submit_work', { task_id: c.task_id, payload });
       log(`verdict ${verdict.verdict.toUpperCase()}${verdict.reasons ? ` (${verdict.reasons[0]})` : ''} · verified in ${verdict.verified_in ?? "?"} · escrow ${verdict.escrow.action} · my record ${verdict.record}`);

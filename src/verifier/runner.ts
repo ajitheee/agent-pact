@@ -12,6 +12,11 @@ Isolation layers (hackathon-grade, not a hard boundary): a separate process the 
 a wall-clock timeout; -I isolated mode with a bare environment and a throwaway cwd; POSIX rlimits
 on CPU and memory; and an audit hook refusing network, subprocess, filesystem-mutation and ctypes
 operations. Production would wrap this in a container or nsjail.
+
+Verifiers can call run_submission(code, function, inputs) to test code a worker delivered. The
+submission runs in a child process (this runner again, in "submission" mode, with the same limits),
+so it never shares memory with the verifier and can't rewrite its checks or forge its verdict:
+the verifier only sees the JSON values the function returned.
 """
 
 import io
@@ -25,22 +30,36 @@ BLOCKED_EVENTS = (
     "os.unlink", "os.chmod", "os.chown", "os.truncate", "os.symlink", "os.link", "os.putenv",
     "os.unsetenv", "os.startfile", "shutil.", "ctypes.", "winreg.", "_winapi.", "urllib.",
     "http.client.", "ftplib.", "smtplib.", "webbrowser.", "pty.",
+    # The garbage collector would reach the hook itself; rlimits must stay where they were set.
+    "gc.", "resource.setrlimit", "resource.prlimit",
 )
-BLOCKED_IMPORTS = {"ctypes", "_ctypes"}
+# subprocess is imported only by run_submission, so a submission can neither import it nor find it loaded.
+BLOCKED_IMPORTS = frozenset({"ctypes", "_ctypes", "subprocess", "_posixsubprocess", "_winapi", "multiprocessing"})
 WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
+CHILD_ENV = {k: v for k, v in os.environ.items() if k in ("PATH", "SYSTEMROOT", "PATHEXT")}
+SPAWNING = [False]  # set only while run_submission starts its child process
 
 
-def guard(event, args):
-    if event == "import":
-        if args[0].split(".")[0] in BLOCKED_IMPORTS:
-            raise ImportError(f"sandbox: importing {args[0]} is not allowed")
-    elif event == "open":
-        _, mode, flags = args
-        writing = any(c in mode for c in "wax+") if isinstance(mode, str) else bool(flags & WRITE_FLAGS)
-        if writing:
-            raise PermissionError("sandbox: writing files is not allowed")
-    elif event.startswith(BLOCKED_EVENTS):
-        raise PermissionError(f"sandbox: {event} is not allowed")
+def make_guard(spawning=None):
+    """The audit hook. Its lists are bound here, so code that rebinds the module globals can't loosen it.
+    Only the verifier's own process passes spawning; a submission's hook has no off switch."""
+    blocked_events, blocked_imports, write_flags = BLOCKED_EVENTS, BLOCKED_IMPORTS, WRITE_FLAGS
+
+    def guard(event, args):
+        if spawning is not None and spawning[0]:
+            return
+        if event == "import":
+            if args[0].split(".")[0] in blocked_imports:
+                raise ImportError(f"sandbox: importing {args[0]} is not allowed")
+        elif event == "open":
+            _, mode, flags = args
+            writing = any(c in mode for c in "wax+") if isinstance(mode, str) else bool(flags & write_flags)
+            if writing:
+                raise PermissionError("sandbox: writing files is not allowed")
+        elif event.startswith(blocked_events):
+            raise PermissionError(f"sandbox: {event} is not allowed")
+
+    return guard
 
 
 def limit_resources(cpu_seconds, memory_mb):
@@ -73,6 +92,60 @@ def normalize(result):
     return bool(result), None if result else f"verify() returned {result!r}"[:500]
 
 
+def run_submission(code, function, inputs, timeout=3):
+    """Call function(x) for each input, with the worker's code in its own sandboxed process.
+
+    Returns the list of results. Raises AssertionError (a failed verdict) if the code doesn't define
+    the function, raises, times out or returns something that isn't JSON."""
+    inputs = list(inputs)
+    request = json.dumps({"mode": "submission", "code": code, "function": function, "inputs": inputs})
+    SPAWNING[0] = True
+    try:
+        import subprocess
+
+        try:
+            # sys.orig_argv re-runs this runner exactly as it was started (a file in Blaxel, -c locally).
+            child = subprocess.run([sys.executable, *sys.orig_argv[1:]], input=request, capture_output=True,
+                                   encoding="utf-8", timeout=timeout, env=CHILD_ENV)
+        except subprocess.TimeoutExpired:
+            raise AssertionError(f"the submitted code took longer than {timeout}s") from None
+    finally:
+        SPAWNING[0] = False
+    try:
+        result = json.loads(child.stdout.strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        raise AssertionError("the submitted code crashed before returning anything") from None
+    if not isinstance(result, dict) or not result.get("ok"):
+        raise AssertionError(str(result.get("error") if isinstance(result, dict) else result)[:300])
+    results = result.get("results")
+    if not isinstance(results, list) or len(results) != len(inputs):
+        raise AssertionError("the submitted code did not return one result per input")
+    return results
+
+
+def submission(request, reply):
+    """Child side of run_submission: untrusted code, same sandbox, and only its return values go back."""
+    namespace = {"__name__": "submission"}
+    function = request["function"]
+    try:
+        exec(compile(request["code"], "<submission>", "exec"), namespace)
+    except BaseException as exc:
+        return reply(ok=False, error=f"the submitted code does not run: {describe(exc)}")
+    fn = namespace.get(function)
+    if not callable(fn):
+        return reply(ok=False, error=f"the submitted code does not define {function}()")
+    results = []
+    for value in request["inputs"]:
+        try:
+            results.append(fn(value))
+        except BaseException as exc:
+            return reply(ok=False, error=f"{function}({value!r}) raised {describe(exc)}")
+    try:
+        reply(ok=True, results=results)
+    except (TypeError, ValueError):
+        reply(ok=False, error=f"{function}() returned a value that isn't plain JSON")
+
+
 def main():
     out = sys.stdout
 
@@ -82,10 +155,13 @@ def main():
 
     request = json.loads(sys.stdin.read())
     limit_resources(request.get("cpu_seconds", 5), request.get("memory_mb", 512))
-    sys.addaudithook(guard)
+    is_submission = request["mode"] == "submission"
+    sys.addaudithook(make_guard(None if is_submission else SPAWNING))
     sys.stdout = sys.stderr = io.StringIO()  # verifier prints must not corrupt the reply
+    if is_submission:
+        return submission(request, reply)
 
-    namespace = {"__name__": "verifier"}
+    namespace = {"__name__": "verifier", "run_submission": run_submission}
     try:
         exec(compile(request["code"], "<verifier>", "exec"), namespace)
     except BaseException as exc:

@@ -16,7 +16,7 @@ import { openDb } from '../src/db.js';
 import { EmailBridge } from '../src/email/bridge.js';
 import { FakeMail, PrimitiveMail } from '../src/email/primitive.js';
 import { Market, usd } from '../src/market.js';
-import { railFromEnv } from '../src/rails.js';
+import { railFromEnv, stripeDashboardBase } from '../src/rails.js';
 import { Verifiers } from '../src/verifier/index.js';
 
 const { values: flags } = parseArgs({ options: { url: { type: 'string' }, tokens: { type: 'string' }, fast: { type: 'boolean' } } });
@@ -288,8 +288,9 @@ async function main() {
   }
 
   await banner('Settlement');
+  const dashboard = config.stripeKey ? await stripeDashboardBase() : '';
   for (const { pi, label } of intents) {
-    const link = pi.startsWith('pi_fake') ? '' : `  https://dashboard.stripe.com/test/payments/${pi}`;
+    const link = pi.startsWith('pi_fake') ? '' : `  ${dashboard}/payments/${pi}`;
     console.log(`   ${label.padEnd(30)} ${pi}${link}`);
   }
   const reps = await poster.call('list_bids', { task_id: t2.task_id });
