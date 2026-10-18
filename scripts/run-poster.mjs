@@ -31,7 +31,7 @@ const child = spawn(exe, args, { stdio: ['pipe', stream ? 'pipe' : 'inherit', 'i
 // POSTER_MIN_BIDS=3 (set by `npm run live -- --with-worker-b`) makes the poster wait for a third bid from Claude Desktop.
 let brief = readFileSync('clients/poster.md', 'utf8');
 const minBids = Number(process.env.POSTER_MIN_BIDS ?? 2);
-if (minBids !== 2) brief = brief.replace('at least 2 pending bids', `at least ${minBids} pending bids`);
+if (minBids !== 2) brief = brief.replace('`wait_for_bids` 2', `\`wait_for_bids\` ${minBids}`).replaceAll('2 pending bids', `${minBids} pending bids`);
 child.stdin.end(brief);
 if (stream) createInterface({ input: child.stdout }).on('line', render);
 child.on('exit', (code) => process.exit(code ?? 1));

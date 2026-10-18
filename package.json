@@ -15,7 +15,8 @@
     "worker:a": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx clients/worker-a.ts",
     "poster": "node scripts/run-poster.mjs",
     "blaxel:smoke": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/blaxel-smoke.ts",
-    "live": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/live.ts"
+    "live": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/live.ts",
+    "preflight": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --import tsx scripts/preflight.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,7 +1,7 @@
 # Demo day: pitch script and runbook
 
 Live server: `https://calm-zero-8lj48.run.mcp-use.com/mcp`. The demo is one command, `npm run live`, which
-takes about 85 seconds. Submissions and live demos are Sunday at 10:00 AM.
+takes about 60 seconds. Submissions and live demos are Sunday at 10:00 AM.
 
 ## The pitch (3:00)
 
@@ -27,12 +27,12 @@ pay only after the work is verified."*
 | Say | Screen |
 |---|---|
 | "Three agents on three different MCP clients, one escrow server on Manufact." | Header: poster = Claude Code, worker-a = mcp-use, mallory = mcp-use |
-| "The poster needs a function written. It posts a $2 task, and the acceptance criteria are tests, not prose: 9 examples plus 25 random titles generated at check time, so nobody can hardcode the answers." | `→ post_task … verifier: python` |
-| "Workers bid within seconds, from three different clients. Mallory is new and cheapest; worker B in Claude Desktop is cheap but slow." | The `bid` lines, including `worker-b … (from Claude Desktop)` |
-| "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes 55 cents: held, not moved." | The poster's reasoning line, then `accept_bid … "status":"held"` |
-| **"Mallory delivers code that looks finished. The tests run in a Blaxel sandbox, never on the worker, with her code in its own process so it can't touch the judge. It fails on the first example. The hold is released, so the poster pays nothing, and Mallory's record drops to zero."** | `verdict FAIL (slugify('Hello, World!') returned 'hello,-world!', expected 'hello-world') · verified in blaxel · escrow released` |
-| "The poster filters by reputation and re-hires worker A." | `list_bids {"min_reputation":0.5}` |
-| "All 34 checks pass in Blaxel. A dollar fifty captured. No human touched anything." | `verdict PASS · verified in blaxel · escrow captured` |
+| "The poster needs a function written. It posts a $2 task, and the acceptance criteria are tests, not prose: 9 examples plus 25 random titles generated at check time, so nobody can hardcode the answers." | `POSTED  $2.00 budget · 240s deadline · Python tests, run in a sandbox` |
+| "Workers bid within seconds, from three different clients. Mallory is new and cheapest; worker B in Claude Desktop is cheap but slow." | The `BID` lines: `worker-b  Claude Desktop  $0.80  ETA 300s  ✗ misses the deadline` |
+| "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes 55 cents: held, not moved." | The `POSTER` line naming worker B's ETA, then `HELD  $0.55 held on Stripe for mallory-…` |
+| **"Mallory delivers code that looks finished. The tests run in a Blaxel sandbox, never on the worker, with her code in its own process so it can't touch the judge. It fails on the first example. The hold is released, so the poster pays nothing, and Mallory's record drops to zero."** | `FAIL  mallory-…: slugify('Hello, World!') returned 'hello,-world!', expected 'hello-world'`, then `tested in Blaxel · hold released` |
+| "The poster filters by reputation and re-hires worker A." | The `POSTER` line about filtering by reputation, then `HELD  $1.50 held on Stripe for worker-a` |
+| "All 34 checks pass in Blaxel. A dollar fifty captured. No human touched anything." | `PASS  worker-a: every test passed in Blaxel · $1.50 captured` |
 | "Here's Stripe: one hold canceled, one captured, and the verdict is written on each payment." | Stripe tab: the two PaymentIntents from the settlement table |
 | "And every step is one email thread that no human read: posted, bids, award, fail, pass, payment." | Primitive: poster@ inbox, the task's thread |
 
@@ -49,6 +49,9 @@ pay only after the work is verified."*
 ## Runbook
 
 **T-30 minutes**
+- [ ] `npm run preflight`: every line should be ✓. It checks the server build, the agent tokens, the server's
+      Python sandbox, Blaxel, Stripe, the poster's Anthropic credits, Primitive and the worker B setup, in about
+      10 seconds, and each ✗ line says what to fix.
 - [ ] `npm run live`: one full rehearsal. It starts with a warm-up that wakes the server, the database pool and the
       Blaxel sandbox, and it should print `warm-up: … ready` with no errors.
 - [ ] Open the tabs: Stripe payments in the sandbox (click a link in the rehearsal's settlement table; the links
@@ -60,7 +63,7 @@ pay only after the work is verified."*
       work: the app rewrites its own config from memory.
 - [ ] Check worker B once. In Claude Desktop, open a session started on **This computer**, where the
       `escrow-worker-b` tools are enabled. Ask it: *Use the escrow-worker-b tool list_open_tasks with capability
-      "data" and tell me the result.* Choose "Always allow" so the demo never stops for an approval. Use this same
+      "code" and tell me the result.* Choose "Always allow" so the demo never stops for an approval. Use this same
       session on stage.
 - [ ] With worker B, run `npm run live -- --with-worker-b` instead.
       1. After the warm-up, worker B's prompt is on your clipboard and the terminal pauses at **▶ In Claude
@@ -77,8 +80,11 @@ pay only after the work is verified."*
          finishes as the 2-worker version.
       6. For rehearsals and the backup video, Claude Code can send worker B's prompt into that Desktop session for
          you; then run `npm run live -- --with-worker-b --no-pause`, which skips the Enter step. A full 3-client
-         run took 96 seconds.
-- [ ] Set the terminal to a large font, maximize it, and turn off notifications.
+         run took 61 seconds.
+- [ ] If you deployed since Claude Desktop last started, quit and reopen it, so worker B gets the current tool list
+      (including `wait_seconds`, which lets it wait for the task instead of checking in a tight loop).
+- [ ] Set the terminal to a large font, maximize it, and turn off notifications. The screen is a presenter view: one
+      line per market event. `npm run live -- --verbose` shows every tool call instead, for debugging.
 
 **On stage:** run `npm run live`, narrate from the table above, and say the warm-up line if anyone asks about setup.
 The poster waits up to 90 seconds for bids, so keep talking if there's a pause.
@@ -133,7 +139,7 @@ and deliver by replying.
 captured or canceled. Going live means live keys plus Stripe Connect payouts to workers.
 
 **Measured today:**
-- A full live run takes about 85s.
+- A full live run with all three clients takes about 60s (61s measured).
 - A Blaxel verification takes about 200–350ms when warm.
 - 26 automated tests pass.
 - Each task gets one email thread with every step in it.

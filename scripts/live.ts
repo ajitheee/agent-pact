@@ -11,22 +11,30 @@
 //                   Its prompt goes on the clipboard. Paste and send it before the poster starts: worker B
 //                   long-polls list_open_tasks, so it bids as soon as the task exists. The poster waits for
 //                   3 bids, and worker B's 80¢ / 300s bid loses on the 240s deadline.
+//
+// The screen is a presenter view: one line per market event (posted, bids, Stripe holds, verdicts), read from the
+// escrow's own event log, plus the poster's one-line decisions. --verbose shows every tool call and worker log instead.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createInterface as createPrompt } from 'node:readline/promises';
 import { mintToken } from '../src/agents.js';
 import { config } from '../src/config.js';
-import { openDb } from '../src/db.js';
+import { openDb, type EventRow } from '../src/db.js';
 import { newId } from '../src/ids.js';
 import { usd } from '../src/market.js';
 import { stripeDashboardBase } from '../src/rails.js';
 
 const tokens = JSON.parse(readFileSync('clients/tokens.local.json', 'utf8')) as Record<string, string>;
 const withWorkerB = process.argv.includes('--with-worker-b');
+const verbose = process.argv.includes('--verbose');
 const paint = (code: string, s: string) => `\x1b[${code}m${s}\x1b[0m`;
 const started = Date.now();
 const clock = () => paint('2', `${String(Math.round((Date.now() - started) / 1000)).padStart(4)}s`);
+/** One presenter line: a bold event label, then the text. Continuation lines indent under the text. */
+const say = (kind: string, color: string, text: string) => console.log(`${clock()}  ${paint(`${color};1`, kind.padEnd(7))}  ${text}`);
+const INDENT = ' '.repeat(16);
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 // A fresh Mallory, registered straight in the shared database.
 const db = await openDb();
@@ -39,6 +47,7 @@ console.log(paint('1', `\nAgent Task Escrow · live run against ${tokens.url}`))
 console.log(
   paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}\n`),
 );
+if (!verbose) console.log(paint('2', 'presenter view: one line per market event. Add --verbose to see every tool call.\n'));
 await warmUp();
 if (withWorkerB) await readyWorkerB();
 
@@ -101,25 +110,44 @@ async function warmUp() {
 const node = (args: string[], env: Record<string, string> = {}) =>
   spawn(process.execPath, ['--env-file-if-exists=.env', '--disable-warning=ExperimentalWarning', ...args], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
 
+/** What a child's output line becomes on screen: the text to print under its label, or null to hide it. */
+type View = (text: string) => string | null;
+
 const children: ChildProcess[] = [];
-function attach(name: string, color: string, child: ChildProcess, strip = /^\d\d:\d\d:\d\d \[[^\]]+\] /) {
+function attach(name: string, color: string, child: ChildProcess, strip = /^\d\d:\d\d:\d\d \[[^\]]+\] /, view: View = (t) => t) {
   children.push(child);
   const label = paint(color, name.padStart(13));
   for (const stream of [child.stdout!, child.stderr!]) {
     createInterface({ input: stream }).on('line', (line) => {
-      const text = line.replace(strip, '');
-      if (text.trim() && !text.startsWith('>')) console.log(`${clock()} ${label}  ${text}`);
+      const text = view(line.replace(strip, ''));
+      if (text?.trim() && !text.startsWith('>')) console.log(`${clock()} ${label}  ${text}`);
     });
   }
   return new Promise<number>((resolve) => child.on('exit', (code) => resolve(code ?? 0)));
 }
 
-const startWorkerA = () => attach('worker-a', '32', node(['--import', 'tsx', 'clients/worker-a.ts', '--once']));
+// Presenter view: the event log tells the story, so worker logs show only trouble.
+const workerView: View = (text) => (verbose || /connect attempt|submit failed|skipped|retrying/.test(text) ? text : null);
+
+/** Presenter view of the poster: only its short decision lines, not tool calls or the closing summary. */
+function posterView(): View {
+  let summary = false;
+  return (text) => {
+    if (verbose) return text;
+    if (!text.trim()) summary = true; // the closing summary follows a blank line; the settlement table covers it
+    else if (!summary && /^  \S/.test(text)) say('POSTER', '36', `"${clip(text.trim(), 150)}"`);
+    return null;
+  };
+}
+
+const startWorkerA = () => attach('worker-a', '32', node(['--import', 'tsx', 'clients/worker-a.ts', '--once']), undefined, workerView);
 const startMallory = () =>
   attach(
     mallory,
     '35',
     node(['--import', 'tsx', 'clients/worker-a.ts', '--as', mallory, '--price', '55', '--eta', '30', '--garbage', '--once'], { ESCROW_AGENT_TOKEN: malloryToken }),
+    undefined,
+    workerView,
   );
 
 // Without worker B the scripted workers are up before the task exists. With it, they wait until Claude Desktop
@@ -130,9 +158,65 @@ if (!withWorkerB) {
   await new Promise((r) => setTimeout(r, 4000)); // let both workers connect before the task exists
 }
 const posterProcess = node(['scripts/run-poster.mjs', '--stream'], withWorkerB ? { POSTER_MIN_BIDS: '3' } : {});
-const poster = attach('poster', '36', posterProcess, /^\[poster\] /);
+const poster = attach('poster', '36', posterProcess, /^\[poster\] /, posterView());
 if (withWorkerB) {
   workers = cueWorkerB(posterProcess).then(() => Promise.all([startWorkerA(), startMallory()]));
+}
+const watching = { on: !verbose };
+const events = watching.on ? watchEvents() : Promise.resolve();
+
+/** Presenter view: the escrow's own event log for the task this run posts, one line per step. */
+async function watchEvents() {
+  const watch = await openDb();
+  let task: { id: string; spec: string; deadline_at: number } | undefined;
+  let after = 0;
+  for (;;) {
+    // Decide before reading, so the events written just before the poster exits still show.
+    const last = !watching.on;
+    if (!task) {
+      [task] = await watch.query<{ id: string; spec: string; deadline_at: number }>(
+        "SELECT id, spec, deadline_at FROM tasks WHERE poster_id = 'poster' AND created_at >= $1 ORDER BY created_at LIMIT 1",
+        [started - 30_000],
+      );
+    }
+    if (task) {
+      for (const e of await watch.query<EventRow>('SELECT * FROM events WHERE task_id = $1 AND seq > $2 ORDER BY seq', [task.id, after])) {
+        after = e.seq;
+        showEvent(task, e);
+      }
+    }
+    if (last) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  await watch.close();
+}
+
+function showEvent(task: { spec: string; deadline_at: number }, e: EventRow) {
+  const d = JSON.parse(e.data) as Record<string, any>;
+  const client = (w: string) => (w === 'worker-b' ? 'Claude Desktop' : w.startsWith('mallory') ? 'mcp-use client, new' : 'mcp-use client');
+  const where = (s?: string) => (s === 'blaxel' ? 'Blaxel' : s === 'local' ? 'the local sandbox' : 'the sandbox');
+  const left = Math.round((task.deadline_at - e.at) / 1000);
+  switch (e.type) {
+    case 'posted':
+      say('POSTED', '36', `${usd(d.budget_max)} budget · ${left}s deadline · ${d.verifier_type === 'python' ? 'Python tests, run in a sandbox' : 'JSON Schema check'}`);
+      return console.log(INDENT + paint('2', `"${clip(task.spec, 110)}"`));
+    case 'bid':
+    case 'rebid': {
+      const late = d.eta_seconds > left ? paint('31', `   ✗ misses the deadline (${left}s left)`) : '';
+      return say('BID', '34', `${e.actor.padEnd(13)} ${client(e.actor).padEnd(20)} ${usd(d.price).padStart(6)}  ETA ${d.eta_seconds}s${late}`);
+    }
+    case 'awarded':
+      return say('HELD', '33', `${usd(d.price)} held on Stripe for ${d.worker} · authorized, not moved`);
+    case 'failed':
+      say('FAIL', '31', `${e.actor}: ${d.reason}`);
+      return console.log(INDENT + paint('2', `tested in ${where(d.sandbox)} · hold released, the poster pays nothing`));
+    case 'passed':
+      return say('PASS', '32', `${e.actor}: every test passed in ${where(d.sandbox)} · ${usd(d.amount)} captured`);
+    case 'timed_out':
+      return say('LATE', '31', `${d.worker} missed the deadline · hold released`);
+    case 'expired':
+      return say('EXPIRED', '31', 'the deadline passed without a passing delivery · nothing paid');
+  }
 }
 
 /** Once the task is open, wait for Claude Desktop's bid (45 seconds at most), then return. */
@@ -144,7 +228,7 @@ function cueWorkerB(child: ChildProcess) {
       const taskId = /"task_id":"(t_[0-9a-z]+)","status":"open"/.exec(line)?.[1];
       if (!taskId || cued) return;
       cued = true;
-      console.log(`${clock()} ${paint('34', 'worker-b'.padStart(13))}  task ${taskId} is open; waiting for worker B's bid from Claude Desktop`);
+      if (verbose) console.log(`${clock()} ${paint('34', 'worker-b'.padStart(13))}  task ${taskId} is open; waiting for worker B's bid from Claude Desktop`);
       const watch = await openDb();
       let bid: { price: number; eta_seconds: number } | undefined;
       for (let i = 0; i < 23 && !bid; i++) {
@@ -152,11 +236,8 @@ function cueWorkerB(child: ChildProcess) {
         if (!bid) await new Promise((r) => setTimeout(r, 2000));
       }
       await watch.close();
-      console.log(
-        bid
-          ? `${clock()} ${paint('34', 'worker-b'.padStart(13))}  bid ${bid.price}¢, eta ${bid.eta_seconds}s (from Claude Desktop) · starting the other workers`
-          : paint('33', `${clock()} no bid from Claude Desktop after 45 seconds; starting the other workers anyway`),
-      );
+      if (!bid) console.log(paint('33', `${clock()} no bid from Claude Desktop after 45 seconds; starting the other workers anyway`));
+      else if (verbose) console.log(`${clock()} ${paint('34', 'worker-b'.padStart(13))}  bid ${bid.price}¢, eta ${bid.eta_seconds}s (from Claude Desktop) · starting the other workers`);
       done();
     });
   });
@@ -165,6 +246,8 @@ function cueWorkerB(child: ChildProcess) {
 const posterExit = await poster;
 await Promise.race([workers, new Promise((r) => setTimeout(r, 15_000))]);
 for (const c of children) if (c.exitCode === null) c.kill();
+watching.on = false;
+await events;
 
 // Settlement, straight from the database: every escrow hold on the task this run posted (30s of slack for clock skew).
 const summary = await openDb();

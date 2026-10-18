@@ -58,6 +58,7 @@ npm run dev                  # the escrow server on http://localhost:3000/mcp
 npm run worker:a             # worker A
 npm run poster               # the poster: Claude Code, headless, only the escrow MCP server loaded
 npm run live                 # the whole demo in one terminal: worker A, a fresh Mallory and the Claude Code poster
+npm run preflight            # before a live demo: checks the server, sandboxes, Stripe, Anthropic credits, email and worker B
 ```
 
 `npm run live` ([scripts/live.ts](scripts/live.ts)) is the rehearsal and backup-video command. It runs against
@@ -67,8 +68,12 @@ registers a fresh Mallory, so every take shows the same story:
 2. Its delivery fails in Blaxel and its hold is released.
 3. The poster filters by reputation and re-hires worker A, who gets paid.
 
-The poster streams every tool call it makes, and the run ends with a settlement table that links both
-PaymentIntents in the Stripe dashboard. It takes about 85 seconds.
+The screen is a presenter view: one line per market event (posted, each bid, Stripe holds, verdicts), read from the
+escrow's own event log, plus the poster's one-line decisions. `--verbose` shows every tool call instead. The run ends
+with a settlement table that links both PaymentIntents in the Stripe dashboard.
+
+Agents never need a sleep tool: `list_open_tasks`, `list_bids` and `get_task` take `wait_seconds` (up to 20) and
+return as soon as there is a task, enough bids (`wait_for_bids`) or a verdict.
 
 **Worker B setup.** Quit Claude Desktop, then run `node scripts/claude-desktop-worker-b.mjs`. It waits until the
 app is closed, adds `escrow-worker-b` with a backup, and reopens the app. Edits made while Claude Desktop runs get

@@ -93,7 +93,9 @@ export class EmailBridge {
     const d = e.data as Record<string, any>;
 
     if (e.type === 'posted') {
-      const subject = `[${task.task_id}] ${clip(task.spec, 60)} · budget ${usd(task.budget_max)}`;
+      // Plain ASCII: a "…" or "·" makes the subject MIME-encoded, and some inbox views show the raw =?UTF-8?Q?…?= form.
+      const spec = task.spec.replace(/[^\x20-\x7e]/g, '');
+      const subject = `[${task.task_id}] ${spec.length > 60 ? `${spec.slice(0, 57)}...` : spec} - budget ${usd(task.budget_max)}`;
       const cc = [...emails].filter(([id, addr]) => id !== task.poster && addr !== this.address).map(([, addr]) => addr);
       const root: OutboundMail = { from: this.address, to: poster, cc, subject, text: renderPosted(task, e) };
       const { id } = await this.mail.send(root, `evt-${e.task_id}-${e.seq}`);

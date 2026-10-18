@@ -22,6 +22,9 @@ const VERIFIER_DOC = `Machine-checkable acceptance criteria. One of:
   {"type":"python","code":"def verify(payload): ..."}  Python 3, sandboxed (5s, no network, no file writes). Reject with assert or by returning False / (False, "reason"); returning True or None passes. Any exception or timeout counts as a fail.
   To test delivered code, call run_submission(code, "function_name", inputs) inside verify(): it runs the code in its own sandboxed process and returns function_name(x) for each input (raising AssertionError if the code fails to run).`;
 
+// Coerced: a client holding a stale copy of the schema may send "20" as a string.
+const WAIT_SECONDS = z.coerce.number().optional();
+
 /** Register the seven tools. Each call runs as the agent the auth middleware identified. */
 export function registerTools(server: EscrowServer, getMarket: () => Promise<Market>) {
   const run = async (agentId: string | undefined, tool: string, fn: (market: Market, agentId: string) => unknown): Promise<CallToolResult> => {
@@ -100,19 +103,14 @@ Waiting for work: list_open_tasks({"capability":"data","wait_seconds":20}) holds
       inputSchema: z.object({
         capability: z.string().optional().describe('Filter by tag; "data" also matches "data.emails".'),
         since: z.number().int().optional().describe('Cursor from your previous call; returns only what changed after it.'),
-        wait_seconds: z.number().optional().describe('Long-poll: if nothing matches yet, wait up to this many seconds (max 20) and return as soon as something does.'),
+        wait_seconds: WAIT_SECONDS.describe('Long-poll: if nothing matches yet, wait up to this many seconds (max 20) and return as soon as something does.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (args, ctx) =>
-      run(ctx.get('agentId'), 'list_open_tasks', async (m, id) => {
-        const until = Date.now() + Math.min(Math.max(args.wait_seconds ?? 0, 0), 20) * 1000;
-        for (;;) {
-          const page = await m.listOpenTasks(id, args);
-          if (page.tasks.length || ('closed' in page && page.closed?.length) || Date.now() >= until) return page;
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }),
+      run(ctx.get('agentId'), 'list_open_tasks', (m, id) =>
+        longPoll(args.wait_seconds, () => m.listOpenTasks(id, args), (page) => page.tasks.length > 0 || ('closed' in page && !!page.closed?.length)),
+      ),
   );
 
   server.tool(
@@ -142,15 +140,25 @@ Error example: {"error_code":"bid_over_budget","budget_max":200,"your_bid":350,"
 min_reputation drops workers whose score is below it; new workers are kept.
 
 Example: list_bids({"task_id":"t_k3x9q2a1","min_reputation":0.5})
--> {"task_id":"t_k3x9q2a1","task_status":"open","seconds_left":510,"bids":[{"bid_id":"b_7hq2m0zx","worker":"swift","price":150,"eta_seconds":90,"fits_deadline":true,"status":"pending","reputation":1,"record":"3/3"}],"filtered_out":1,"cursor":21}`,
+-> {"task_id":"t_k3x9q2a1","task_status":"open","seconds_left":510,"bids":[{"bid_id":"b_7hq2m0zx","worker":"swift","price":150,"eta_seconds":90,"fits_deadline":true,"status":"pending","reputation":1,"record":"3/3"}],"filtered_out":1,"cursor":21}
+Waiting for bids: list_bids({"task_id":"t_k3x9q2a1","wait_for_bids":2,"wait_seconds":20}) holds the call until 2 pending bids are listed (or 20s pass), so no sleep tool is needed.`,
       inputSchema: z.object({
         task_id: z.string(),
         since: z.number().int().optional().describe('Cursor from a previous call; returns only new or revised bids.'),
         min_reputation: z.number().min(0).max(1).optional().describe('0..1. Hide bids from workers scoring below this.'),
+        wait_for_bids: z.coerce.number().int().optional().describe('With wait_seconds: return as soon as at least this many pending bids are listed (default 1).'),
+        wait_seconds: WAIT_SECONDS.describe('Long-poll: wait up to this many seconds (max 20) for wait_for_bids pending bids. Returns early if the task leaves the open state.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (args, ctx) => run(ctx.get('agentId'), 'list_bids', (m, id) => m.listBids(id, args)),
+    (args, ctx) =>
+      run(ctx.get('agentId'), 'list_bids', (m, id) =>
+        longPoll(
+          args.wait_seconds,
+          () => m.listBids(id, args),
+          (page) => page.task_status !== 'open' || page.bids.filter((b) => b.status === 'pending').length >= (args.wait_for_bids ?? 1),
+        ),
+      ),
   );
 
   server.tool(
@@ -195,11 +203,27 @@ Statuses: open (taking bids), awarded (escrow held, awaiting delivery), complete
 
 Example: get_task({"task_id":"t_k3x9q2a1"})
 -> {"task_id":"t_k3x9q2a1","status":"awarded","awarded_to":"swift","price":150,"escrow":{"payment_intent":"pi_3Q…","status":"held"},"seconds_left":402,"verifier":{…},"attempts":[…],"history":["#14 18:02:11 awarded to swift at $1.50 · escrow held pi_3Q…"], …}`,
-      inputSchema: z.object({ task_id: z.string() }),
+      inputSchema: z.object({
+        task_id: z.string(),
+        wait_seconds: WAIT_SECONDS.describe('Long-poll for the verdict: while the task is awarded, wait up to this many seconds (max 20) and return as soon as its status changes.'),
+      }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (args, ctx) => run(ctx.get('agentId'), 'get_task', (m, id) => m.getTask(id, args)),
+    (args, ctx) => run(ctx.get('agentId'), 'get_task', (m, id) => longPoll(args.wait_seconds, () => m.getTask(id, args), (task) => task.status !== 'awarded')),
   );
+}
+
+/**
+ * Long-poll: run `read` until `ready` says the result is worth returning or wait_seconds (capped at 20) pass,
+ * checking once a second. Lets chat agents wait for work, bids or a verdict without a sleep tool.
+ */
+async function longPoll<T>(waitSeconds: number | undefined, read: () => Promise<T>, ready: (result: T) => boolean): Promise<T> {
+  const until = Date.now() + Math.min(Math.max(waitSeconds ?? 0, 0), 20) * 1000;
+  for (;;) {
+    const result = await read();
+    if (ready(result) || Date.now() >= until) return result;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
 }
 
 /** Postgres deadlock (40P01) or serialization failure (40001). */
