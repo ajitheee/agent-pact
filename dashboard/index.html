@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Task Escrow · live</title>
+<title>AgentPact · live</title>
 <style>
 :root { --bg:#060a13; --panel:#0b1220; --panel2:#0f182b; --line:#1a2640; --text:#e8eef9; --muted:#7b89a6; --violet:#a78bfa; --teal:#2dd4bf; --red:#f87171; --gold:#fbbf24; --green:#34d399; --cyan:#38bdf8; }
 * { box-sizing: border-box; }
@@ -66,7 +66,7 @@ footer .label { color: var(--muted); font-size: 11px; letter-spacing: .1em; text
 </head>
 <body>
 <header>
-  <div class="brand"><b>Agent Task Escrow</b><em>Agents hire agents. Money moves only when the work checks out.</em></div>
+  <div class="brand"><b>AgentPact</b><em>Escrow for agent work. Money moves only when the work checks out.</em></div>
   <span class="live"><span id="dot" class="dot"></span><span id="mode">connecting…</span></span>
   <div class="kpis">
     <div class="kpi gold"><small>Held in escrow</small><div id="kHeld">$0.00</div></div>
@@ -383,6 +383,8 @@ async function showOutput(o) {
     out.scrollTop = out.scrollHeight;
     await wait(45);
   }
+  // On camera, end on the patch's headline once it has typed out.
+  if (STUDIO) { await wait(1200); out.scrollTo({ top: 0, behavior: 'smooth' }); }
 }
 
 async function showAudit(a) {
@@ -471,18 +473,61 @@ async function refresh(s) {
   $('agents').textContent = 'Agent records: ' + named.join(' · ');
 }
 
-const stream = new EventSource('/api/stream');
-stream.onopen = () => setMode(replayToken ? 'replay' : 'waiting');
-stream.onerror = () => { $('mode').textContent = 'reconnecting…'; $('dot').className = 'dot'; };
-stream.addEventListener('event', (m) => {
-  const e = JSON.parse(m.data);
-  if (replaying) { replayToken++; queue.length = 0; replaying = false; }
-  setMode('live');
-  enqueue(() => handle(e));
-});
-stream.addEventListener('output', (m) => { const o = JSON.parse(m.data); enqueue(() => task?.id === o.task_id && showOutput(o)); });
-stream.addEventListener('audit', (m) => { const a = JSON.parse(m.data); enqueue(() => task?.id === a.task_id && showAudit(a.audit)); });
-stream.addEventListener('summary', (m) => refresh(JSON.parse(m.data)));
+// ── studio mode: /?studio=1, embedded by /studio, which directs a recorded run on the video's timeline ──────
+const STUDIO = new URLSearchParams(location.search).has('studio');
+if (STUDIO) {
+  document.querySelector('footer').style.display = 'none';
+  $('banner').remove();
+  $('mode').textContent = 'real run · production';
+  $('dot').className = 'dot on';
+}
+/** Replay a recorded run with each event at a given second (cues.events[i] for the i-th event), then output and audit. */
+window.studioReplay = async (id, cues) => {
+  const token = ++replayToken;
+  queue.length = 0;
+  replaying = true;
+  const d = await (await fetch('/api/task/' + encodeURIComponent(id))).json();
+  startTask(d.task);
+  const t0s = performance.now();
+  const at = (sec, fn) => setTimeout(() => token === replayToken && enqueue(fn), Math.max(0, sec * 1000 - (performance.now() - t0s)));
+  d.events.forEach((e, i) => at(cues.events[i] ?? i * 2, () => handle({ ...e, task: d.task })));
+  if (d.output) at(cues.output, () => showOutput(d.output));
+  if (d.audit) at(cues.audit, () => showAudit(d.audit));
+};
+/** Where things are on screen, for the studio's camera: a rect in this page's CSS pixels. */
+window.focusRect = (name) => {
+  const box = (x1, y1, x2, y2) => {
+    const m = svg.getScreenCTM(); const p = svg.createSVGPoint();
+    p.x = x1; p.y = y1; const a = p.matrixTransform(m); p.x = x2; p.y = y2; const b = p.matrixTransform(m);
+    return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+  };
+  const card = (id) => { const r = $(id).closest('.card').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
+  const lowestSeat = Math.max(SLOTS[1].y, ...[...workers.values()].map((w) => w.slot.y));
+  return {
+    full: { x: 0, y: 0, w: innerWidth, h: innerHeight },
+    arena: box(0, 0, 1000, 620),
+    market: box(400, 25, 960, Math.max(345, lowestSeat + 75)),
+    money: box(50, 110, 600, 410),
+    sandbox: box(300, 420, 700, 605),
+    output: card('output'),
+    audit: card('audit'),
+  }[name];
+};
+
+if (!STUDIO) {
+  const stream = new EventSource('/api/stream');
+  stream.onopen = () => setMode(replayToken ? 'replay' : 'waiting');
+  stream.onerror = () => { $('mode').textContent = 'reconnecting…'; $('dot').className = 'dot'; };
+  stream.addEventListener('event', (m) => {
+    const e = JSON.parse(m.data);
+    if (replaying) { replayToken++; queue.length = 0; replaying = false; }
+    setMode('live');
+    enqueue(() => handle(e));
+  });
+  stream.addEventListener('output', (m) => { const o = JSON.parse(m.data); enqueue(() => task?.id === o.task_id && showOutput(o)); });
+  stream.addEventListener('audit', (m) => { const a = JSON.parse(m.data); enqueue(() => task?.id === a.task_id && showAudit(a.audit)); });
+  stream.addEventListener('summary', (m) => refresh(JSON.parse(m.data)));
+}
 
 setInterval(() => { if (task) { const s = Math.max(0, Math.round((Date.now() - t0) / 1000)); $('clock').textContent = $('mode').textContent === 'live' ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} since posting` : ''; } }, 1000);
 refresh().then(() => { const r = new URLSearchParams(location.search).get('replay'); if (r) replay(r); });

@@ -66,7 +66,7 @@ try {
   const watch = await db.query<{ key: string; value: string }>("SELECT key, value FROM kv WHERE key LIKE 'watch:%' ORDER BY key");
 
   const md = [
-    '# Agent Task Escrow: run dataset',
+    '# AgentPact: run dataset',
     '',
     `Generated ${new Date().toISOString()} from the production database by \`npm run dataset\`. One task per line in`,
     '[runs.jsonl](runs.jsonl): bids, escrow holds, verdicts and the monitor\'s audit. Stripe is in test mode.',

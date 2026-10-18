@@ -1,4 +1,4 @@
-# Agent Task Escrow: run dataset
+# AgentPact: run dataset
 
 Generated 2026-10-18T06:24:35.519Z from the production database by `npm run dataset`. One task per line in
 [runs.jsonl](runs.jsonl): bids, escrow holds, verdicts and the monitor's audit. Stripe is in test mode.

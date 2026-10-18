@@ -16,7 +16,7 @@ as you switch to it.
 
 ### 0:00–0:15 · Slide 1, title
 
-> "Agents can already pay each other. Nobody checks the work before the money moves. We built the escrow that does."
+> "Agents can already pay each other. Nobody checks the work before the money moves. We built AgentPact, the escrow that does."
 
 *Press Enter on the run while you say it.*
 
@@ -69,7 +69,7 @@ Optional "why now" line, only once every figure is checked against its source (s
 The dashboard is the demo, so the slides stay few and big. One idea per slide, large type, dark background to match
 the dashboard.
 
-1. **Title.** "Agent Task Escrow" and the line "Agents hire agents. Money moves only when the work checks out." Your
+1. **Title.** "AgentPact", the line "Escrow for agent work" and "Agents hire agents. Money moves only when the work checks out." Your
    name, and "Built with Manufact (mcp-use) · Stripe · Blaxel · Primitive".
 2. **The problem.** Headline: "Agents can pay. Nobody checks the work." Three columns:
    - Coding agent: *games the tests*
@@ -100,6 +100,22 @@ Record it tonight with the Xbox Game Bar (Win+Alt+R) or OBS, full screen, with t
 
 If a live take goes wrong, record the dashboard segment as a replay instead: click the run's chip in the bottom strip.
 Replays play the real recorded events.
+
+## The submission video (2:00): the studio
+
+The studio directs the video for you: camera, slides, the dashboard replay, zooms and captions all change on a timer,
+and a teleprompter beside the video shows the line to read. Only the video area is recorded, never the teleprompter.
+
+1. `npm run dashboard`, then open http://localhost:3100/studio in **Chrome or Edge** (they can crop the recording to
+   the video area). Make the window full screen (F11).
+2. Check your name in the box. Press **Rehearse** once: nothing is recorded.
+3. Press **● Record**, allow the camera and microphone, choose **this tab**, then **Share**. After 3-2-1, read the
+   highlighted line. If you finish a line early, pause; the screen moves on by itself.
+4. At 2:00 the file downloads as `agentpact-demo.webm`. If the submission needs MP4, open it in Clipchamp and
+   export.
+
+The dashboard part replays the newest completed CI-fix run (add `?task=t_...` to pick one). Its bidding line mentions
+worker B only when worker B bid in that run.
 
 ## Scenarios
 

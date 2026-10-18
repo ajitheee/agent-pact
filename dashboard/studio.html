@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentPact · studio</title>
+<style>
+:root { --bg:#060a13; --panel:#0b1220; --panel2:#0f182b; --line:#1f2d4a; --text:#e8eef9; --soft:#c3cfe3; --muted:#8391ad; --gold:#fbbf24; --teal:#2dd4bf; --violet:#a78bfa; --red:#f87171; --green:#34d399; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #03060c; color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
+body { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; padding: 16px; }
+#frame { display: flex; align-items: center; justify-content: center; min-width: 0; }
+#stage { position: relative; overflow: hidden; background: var(--bg); }
+#canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; font-family: "Segoe UI", system-ui, sans-serif; }
+.scene { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+.scene.on { opacity: 1; }
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity .6s ease, transform .6s ease; }
+.reveal.show { opacity: 1; transform: none; }
+.eyebrow { font: 600 26px/1.3 Consolas, "Courier New", monospace; letter-spacing: 3px; text-transform: uppercase; }
+h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -1px; }
+p { margin: 0; }
+/* face */
+#cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #0b1220; }
+#camFallback { position: absolute; inset: 0; background: radial-gradient(circle at 70% 45%, #2b2109 0%, #0b101d 45%, #060a13 100%); display: none; }
+.shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6,10,19,.55) 0%, rgba(6,10,19,0) 30%, rgba(6,10,19,0) 55%, rgba(6,10,19,.85) 100%); }
+.brand { position: absolute; left: 72px; top: 60px; display: flex; align-items: center; gap: 18px; font-size: 34px; font-weight: 700; }
+.brand small { font-size: 24px; font-weight: 500; color: var(--soft); }
+.lower { position: absolute; left: 72px; bottom: 80px; display: flex; flex-direction: column; gap: 6px; padding: 22px 34px; background: rgba(11,18,32,.82); border-left: 6px solid var(--gold); }
+.lower b { font-size: 46px; } .lower span { font-size: 28px; color: var(--soft); }
+#outro { position: absolute; left: 72px; right: 72px; bottom: 80px; display: none; flex-direction: column; gap: 22px; }
+#outro h2 { font-size: 76px; line-height: 1.08; max-width: 1500px; }
+.pill { align-self: flex-start; font-size: 30px; padding: 12px 28px; border: 2px solid var(--teal); border-radius: 999px; background: rgba(11,18,32,.85); }
+/* slides */
+.slide { position: absolute; inset: 0; padding: 120px 128px; display: flex; flex-direction: column; gap: 52px; background: var(--bg); }
+.slide h2 { font-size: 76px; line-height: 1.08; }
+.cards { display: flex; gap: 32px; }
+.card { flex: 1; display: flex; flex-direction: column; gap: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 46px; }
+.card h3 { font-size: 46px; line-height: 1.12; } .card p { font-size: 32px; line-height: 1.4; color: var(--soft); }
+.steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 22px; }
+.step { display: flex; flex-direction: column; gap: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 18px; padding: 30px; }
+.step h3 { font-size: 42px; } .step p { font-size: 25px; line-height: 1.4; color: var(--soft); }
+.num { color: var(--gold); }
+/* dashboard */
+#zoom { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; transition: transform 1.3s cubic-bezier(.65, 0, .35, 1); }
+#dash iframe { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; border: 0; transform: scale(1.2); transform-origin: 0 0; background: var(--bg); }
+#caption { position: absolute; left: 50%; bottom: 56px; transform: translate(-50%, 12px); opacity: 0; transition: opacity .45s ease, transform .45s ease; padding: 18px 40px; border-radius: 16px; background: rgba(6,10,19,.92); border: 2px solid var(--gold); font-size: 40px; font-weight: 700; white-space: nowrap; }
+#caption.show { opacity: 1; transform: translate(-50%, 0); }
+/* teleprompter (not recorded) */
+#prompter { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.panel { background: #0b1220; border: 1px solid #1a2640; border-radius: 12px; padding: 14px 16px; }
+.panel h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+button { font: inherit; color: var(--text); background: #12203a; border: 1px solid #2a3c62; border-radius: 9px; padding: 9px 14px; cursor: pointer; }
+button.primary { background: #3a1214; border-color: var(--red); }
+button:disabled { opacity: .45; cursor: default; }
+input { font: inherit; color: var(--text); background: #060a13; border: 1px solid #2a3c62; border-radius: 8px; padding: 7px 10px; width: 100%; }
+#now { font-size: 25px; line-height: 1.45; min-height: 220px; }
+#next { color: var(--muted); font-size: 16px; min-height: 60px; }
+.bar { height: 8px; border-radius: 4px; background: #16223a; overflow: hidden; }
+.bar div { height: 100%; width: 0; background: var(--gold); }
+#count { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 120px; font-weight: 800; color: var(--gold); background: rgba(3,6,12,.75); }
+#status { color: var(--muted); font-size: 13px; }
+#status.warn { color: var(--gold); }
+</style>
+</head>
+<body>
+<div id="frame"><div id="stage"><div id="canvas">
+
+  <div class="scene" id="face">
+    <video id="cam" autoplay muted playsinline></video>
+    <div id="camFallback"></div>
+    <div class="shade"></div>
+    <div class="brand"><svg width="44" height="50" viewBox="0 0 44 50" aria-hidden="true"><polygon points="22,2 42,13.5 42,36.5 22,48 2,36.5 2,13.5" fill="#0b1220" stroke="#fbbf24" stroke-width="3"/><circle cx="22" cy="25" r="5" fill="#fbbf24"/></svg>AgentPact<small>escrow for agent work</small></div>
+    <div class="lower" id="lower"><b id="lowerName">Ajith</b><span>Building AgentPact · escrow for agent work</span></div>
+    <div id="outro"><h2>Verification is the missing layer of agent payments.</h2><p class="pill">github.com/ajitheee/agent-task-escrow</p></div>
+  </div>
+
+  <div class="scene" id="problem"><div class="slide">
+    <h2>Agents can pay. Nobody checks the work.</h2>
+    <div class="cards">
+      <div class="card reveal" id="p1"><p class="eyebrow" style="color:var(--teal)">Coding agent</p><h3>Games the tests</h3><p>CI goes green. The bug ships.</p></div>
+      <div class="card reveal" id="p2"><p class="eyebrow" style="color:var(--teal)">Data agent</p><h3>Runs fine, wrong number</h3><p>The board deck gets a JOIN fan-out.</p></div>
+      <div class="card reveal" id="p3"><p class="eyebrow" style="color:var(--teal)">Back-office agent</p><h3>Invents a figure</h3><p>A VAT amount that was never on the invoice.</p></div>
+    </div>
+    <div style="flex:1"></div>
+    <p class="reveal" id="p4" style="font-size:46px;font-weight:700;color:var(--gold)">So the money waits in escrow, and moves only when a machine check passes.</p>
+  </div></div>
+
+  <div class="scene" id="dash"><div id="zoom"><iframe id="dashFrame" src="/?studio=1" title="Live dashboard"></iframe></div></div>
+
+  <div class="scene" id="how"><div class="slide" style="background:#0a0f1c">
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step reveal" id="s1"><p class="eyebrow num">01</p><h3>Post</h3><p>The task, a budget and the check that decides payment</p></div>
+      <div class="step reveal" id="s2"><p class="eyebrow num">02</p><h3>Bid</h3><p>Any MCP agent bids a price and an ETA</p></div>
+      <div class="step reveal" id="s3"><p class="eyebrow num">03</p><h3>Hold</h3><p>Stripe authorizes the money: held, not moved</p></div>
+      <div class="step reveal" id="s4"><p class="eyebrow num">04</p><h3>Check</h3><p>Runs in a Blaxel sandbox, never on the worker</p></div>
+      <div class="step reveal" id="s5"><p class="eyebrow num">05</p><h3>Settle</h3><p>Pass: paid to the worker. Fail: refunded.</p></div>
+      <div class="step reveal" id="s6"><p class="eyebrow num">06</p><h3>Audit</h3><p>The monitor re-checks, flags cheats, remembers</p></div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="reveal" id="s7" style="display:flex;gap:22px;align-items:center">
+      <p class="eyebrow" style="color:var(--muted)">Running today</p>
+      <p class="pill" style="align-self:auto">Coding: CI fix · $40</p><p class="pill" style="align-self:auto">Data: board-deck SQL · $30</p><p class="pill" style="align-self:auto">Back-office: invoices · $20</p>
+    </div>
+  </div></div>
+
+  <div id="caption"></div>
+</div></div></div>
+
+<div id="prompter">
+  <div class="panel">
+    <h4>Studio · 2-minute demo video</h4>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><label for="name" style="color:var(--muted);white-space:nowrap">Your name</label><input id="name" value="Ajith"></div>
+    <div style="display:flex;gap:8px"><button id="rehearse">Rehearse (no recording)</button><button id="record" class="primary">● Record</button></div>
+    <p id="status" style="margin-top:10px">Loading the run…</p>
+  </div>
+  <div class="panel" style="flex:1;display:flex;flex-direction:column;gap:12px;position:relative">
+    <h4><span id="clock">0:00 / 2:00</span> · read this</h4>
+    <div class="bar"><div id="lineBar"></div></div>
+    <div id="now">Press Rehearse to practice, or Record when ready. The screen follows the script on its own: read the highlighted line, and if you finish early, just pause.</div>
+    <h4>Next</h4>
+    <div id="next"></div>
+    <div class="bar"><div id="totalBar" style="background:var(--teal)"></div></div>
+    <div id="count"></div>
+  </div>
+  <div class="panel" id="done" style="display:none"><h4>Your video</h4><a id="download" style="color:var(--teal)">Download agentpact-demo.webm</a></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const LENGTH = 120;
+const LINES = [
+  [0, 10, "Hi, I'm {name}. Agents can already pay each other, but nobody checks the work before the money moves. So I built AgentPact."],
+  [10, 32, 'Everyone building with agents has seen this. Coding agents game the tests. Data agents write SQL that runs but gives the wrong number. Back-office agents invent figures. So the money waits in escrow, and moves only when a machine check passes.'],
+  [32, 42, "Here's a real run on our production server. A Claude Code agent posts a real bug fix: forty dollars, paid only if the code passes our CI suite and 200 hidden tests."],
+  [42, 54, '{bids}'],
+  [54, 66, 'But Mallory gamed the tests. Her code runs in a Blaxel sandbox, the hidden tests catch it, and the nine dollars go back. The poster pays nothing.'],
+  [66, 74, "Worker A's real fix passes all 208 checks, and twenty-five dollars is paid automatically."],
+  [74, 81, 'This is what the poster got: a patch, ready to merge.'],
+  [81, 94, "Then a monitor audits the whole job, every step and every payment, and flags Mallory. It's saved to memory, so her next identity gets caught too."],
+  [94, 110, 'Any MCP agent can join. Stripe holds the money, Blaxel runs the check, and it already handles code, SQL reports and invoices. No human in the loop.'],
+  [110, 120, "Verification is the missing layer of agent payments. I'm {name}, and this is AgentPact. Thank you."],
+];
+
+// ── stage sizing: a 1920×1080 canvas scaled into the space beside the teleprompter ──
+function fit() {
+  const f = $('frame').getBoundingClientRect();
+  const w = Math.min(f.width, f.height * 16 / 9);
+  $('stage').style.width = w + 'px';
+  $('stage').style.height = (w * 9 / 16) + 'px';
+  $('canvas').style.transform = `scale(${w / 1920})`;
+}
+addEventListener('resize', fit); fit();
+
+// ── scene, caption, reveal and camera moves ──
+const frameWin = () => $('dashFrame').contentWindow;
+function scene(id) { document.querySelectorAll('.scene').forEach((s) => s.classList.toggle('on', s.id === id)); }
+function caption(text) {
+  const c = $('caption');
+  c.classList.remove('show');
+  if (text) setTimeout(() => { c.textContent = text; c.classList.add('show'); }, text && c.textContent ? 250 : 0);
+}
+function reveal(id) { $(id).classList.add('show'); }
+function faceMode(mode) { $('lower').style.display = mode === 'intro' ? 'flex' : 'none'; $('outro').style.display = mode === 'outro' ? 'flex' : 'none'; }
+// The camera frames its target above the caption bar, and may pan past the dashboard's bottom edge (same
+// background) so a card at the very bottom still clears the caption.
+const VIEW_H = 930;
+function zoom(name) {
+  const z = $('zoom');
+  if (name === 'full') { z.style.transform = 'translate(0px, 0px) scale(1)'; return; }
+  const r = frameWin().focusRect(name);
+  if (!r) return;
+  const S = 1.2, x = r.x * S, y = r.y * S, w = r.w * S, h = r.h * S;
+  const s = Math.max(1, Math.min(2.3, 1920 / (w * 1.12), VIEW_H / (h * 1.12)));
+  let tx = 960 - (x + w / 2) * s, ty = VIEW_H / 2 - (y + h / 2) * s;
+  tx = Math.min(0, Math.max(1920 - 1920 * s, tx)); ty = Math.min(0, Math.max(VIEW_H - 1080 * s, ty));
+  z.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+}
+
+// ── the recorded run to replay: the newest completed CI-fix job where Claude Desktop (worker B) bid ──
+let run = null;
+async function pickRun() {
+  const forced = new URLSearchParams(location.search).get('task');
+  const s = await (await fetch('/api/summary')).json();
+  const ids = forced ? [forced] : s.tasks.filter((t) => t.scenario === 'ci-fix' && t.status === 'completed').map((t) => t.id);
+  let fallback = null;
+  for (const id of ids) {
+    const d = await (await fetch('/api/task/' + id)).json();
+    if (!d.task) continue;
+    fallback ??= d;
+    if (d.events.some((e) => e.type === 'bid' && e.actor === 'worker-b') && d.events.some((e) => e.type === 'failed')) return d;
+  }
+  return fallback;
+}
+/** Event times inside the replay (seconds after it starts at 0:31), matched to the script lines. */
+function replayCues(d) {
+  const bids = [11, 13, 15, 16, 17], awards = [18, 31], fails = [23.5, 37];
+  let b = 0, a = 0, f = 0;
+  const events = d.events.map((e, i) => {
+    if (e.type === 'posted') return 1.5;
+    if (e.type === 'bid' || e.type === 'rebid') return bids[Math.min(b++, bids.length - 1)];
+    if (e.type === 'awarded') return awards[Math.min(a++, awards.length - 1)];
+    if (e.type === 'failed') return fails[Math.min(f++, fails.length - 1)];
+    if (e.type === 'passed') return 34.5;
+    return 40 + i;
+  });
+  return { events, output: 43, audit: 50 };
+}
+
+const CUES = [
+  [0, () => { scene('face'); faceMode('intro'); caption(null); zoom('full'); }],
+  [10, () => scene('problem')],
+  [13, () => reveal('p1')], [16.5, () => reveal('p2')], [21, () => reveal('p3')], [26, () => reveal('p4')],
+  [31, () => run && frameWin().studioReplay(run.task.id, replayCues(run))],
+  [32, () => { scene('dash'); caption('A real bug · $40 budget · paid only if CI passes'); }],
+  [42, () => { zoom('market'); caption('Agents bid · the cheapest that fits the deadline wins'); }],
+  [49, () => caption('Stripe holds the money · authorized, not moved')],
+  // The camera follows the money: the check, the refund, the next hold, the check again, the payout.
+  [54, () => { zoom('sandbox'); caption('The check runs in a Blaxel sandbox, never on the worker'); }],
+  [57.6, () => { zoom('money'); caption('Cheat caught · hold released, the poster pays nothing'); }],
+  [62, () => caption('Next bidder: worker A · Stripe holds the money again')],
+  [65.5, () => { zoom('sandbox'); caption('A real fix · every check passes'); }],
+  [69.3, () => { zoom('market'); caption('Paid automatically · no human in the loop'); }],
+  [74, () => { zoom('output'); caption('The deliverable: a patch, ready to merge'); }],
+  [81, () => { zoom('audit'); caption('Monitor: every step and every payment re-checked'); }],
+  [91, () => { zoom('full'); caption(null); }],
+  [94, () => scene('how')],
+  [96, () => reveal('s1')], [98, () => reveal('s2')], [100, () => reveal('s3')], [102, () => reveal('s4')], [104, () => reveal('s5')], [106, () => reveal('s6')], [108, () => reveal('s7')],
+  [110, () => { scene('face'); faceMode('outro'); }],
+];
+
+// ── the clock ──
+let fired = 0, t0 = 0, running = false, onEnd = null;
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+// The bidding line matches the run: worker B (Claude Desktop) is only mentioned when it bid.
+const bidsLine = () =>
+  run?.events.some((e) => e.type === 'bid' && e.actor === 'worker-b')
+    ? 'Agents bid in seconds from different apps. Worker B, in Claude Desktop, is too slow for the deadline. Mallory is cheapest, so she wins, and Stripe holds nine dollars.'
+    : 'Agents bid in seconds. Worker A has a perfect record. Mallory is new and cheapest, so she wins, and Stripe holds nine dollars.';
+const sayLine = (i) => (LINES[i] ? LINES[i][2].replaceAll('{name}', $('name').value.trim() || 'the founder').replace('{bids}', bidsLine()) : '');
+function reset() {
+  fired = 0;
+  document.querySelectorAll('.reveal').forEach((r) => r.classList.remove('show'));
+  caption(null); zoom('full'); scene('face'); faceMode('intro');
+}
+function tick() {
+  if (!running) return;
+  const t = (performance.now() - t0) / 1000;
+  while (fired < CUES.length && CUES[fired][0] <= t) { try { CUES[fired][1](); } catch (e) { console.error(e); } fired++; }
+  const i = LINES.findIndex(([a, b]) => t >= a && t < b);
+  if (i >= 0) {
+    const [a, b] = LINES[i];
+    if ($('now').dataset.i !== String(i)) { $('now').textContent = sayLine(i); $('now').dataset.i = i; $('next').textContent = sayLine(i + 1); }
+    $('lineBar').style.width = ((t - a) / (b - a)) * 100 + '%';
+  }
+  $('clock').textContent = `${fmt(Math.min(t, LENGTH))} / 2:00`;
+  $('totalBar').style.width = Math.min(100, (t / LENGTH) * 100) + '%';
+  if (t >= LENGTH) { running = false; onEnd?.(); return; }
+  requestAnimationFrame(tick);
+}
+async function countdown() {
+  const c = $('count'); c.style.display = 'flex';
+  for (const n of [3, 2, 1]) { c.textContent = n; await new Promise((r) => setTimeout(r, 1000)); }
+  c.style.display = 'none';
+}
+function play(end) {
+  reset(); onEnd = end; running = true; t0 = performance.now();
+  $('now').textContent = sayLine(0); $('now').dataset.i = 0; $('next').textContent = sayLine(1);
+  requestAnimationFrame(tick);
+}
+
+// ── camera and microphone ──
+let mic = null;
+async function startCamera() {
+  try {
+    const media = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: { echoCancellation: true, noiseSuppression: true } });
+    $('cam').srcObject = new MediaStream(media.getVideoTracks());
+    mic = media.getAudioTracks()[0];
+    return true;
+  } catch {
+    try { const audio = await navigator.mediaDevices.getUserMedia({ audio: true }); mic = audio.getAudioTracks()[0]; } catch { mic = null; }
+    $('cam').style.display = 'none'; $('camFallback').style.display = 'block';
+    return false;
+  }
+}
+const status = (text, warn) => { $('status').textContent = text; $('status').className = warn ? 'warn' : ''; };
+const busy = (on) => { $('rehearse').disabled = on; $('record').disabled = on; };
+
+$('name').addEventListener('input', () => { $('lowerName').textContent = $('name').value.trim() || ' '; try { localStorage.setItem('studio-name', $('name').value); } catch {} });
+try { const saved = localStorage.getItem('studio-name'); if (saved) { $('name').value = saved; $('lowerName').textContent = saved; } } catch {}
+
+$('rehearse').onclick = async () => {
+  busy(true);
+  const cam = await startCamera();
+  status(cam ? 'Rehearsal: nothing is recorded.' : 'Rehearsal without a camera: the face scenes show the title card.', !cam);
+  await countdown();
+  play(() => { busy(false); status('Rehearsal done. Record when ready.'); });
+};
+
+$('record').onclick = async () => {
+  busy(true);
+  const cam = await startCamera();
+  if (!mic) status('No microphone found: the video will be silent.', true);
+  let display;
+  try {
+    status('Choose "this tab" in the browser prompt, then Share.');
+    display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, cursor: 'never' }, audio: false, preferCurrentTab: true, selfBrowserSurface: 'include' });
+  } catch {
+    busy(false); status('Recording needs permission to share this tab. Try Record again.', true); return;
+  }
+  const video = display.getVideoTracks()[0];
+  if ('CropTarget' in window) {
+    try { await video.cropTo(await CropTarget.fromElement($('stage'))); } catch { status('Could not crop to the video area: the teleprompter will show in the recording.', true); }
+  } else status('This browser cannot crop the recording: use Chrome or Edge, or the teleprompter will show.', true);
+  const tracks = [video, ...(mic ? [mic] : [])];
+  const type = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+  const recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: type, videoBitsPerSecond: 10_000_000 });
+  const chunks = [];
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = () => {
+    display.getTracks().forEach((t) => t.stop());
+    const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+    const a = $('download'); a.href = url; a.download = 'agentpact-demo.webm';
+    $('done').style.display = 'block'; a.click();
+    busy(false); status(`Saved ${cam ? '' : '(no camera) '}to your Downloads folder as agentpact-demo.webm.`);
+  };
+  await countdown();
+  recorder.start(1000);
+  status('Recording… read the highlighted line.');
+  play(() => setTimeout(() => recorder.stop(), 400));
+};
+
+pickRun().then((d) => {
+  run = d;
+  status(d ? `Ready. The dashboard part replays ${d.task.id}, a real CI-fix run on production.` : 'No CI-fix run found: run npm run live first.', !d);
+}).catch(() => status('Could not reach the dashboard server: is npm run dashboard running?', true));
+scene('face'); faceMode('intro');
+</script>
+</body>
+</html>

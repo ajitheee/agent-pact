@@ -148,6 +148,10 @@ createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       return res.end(readFileSync('dashboard/index.html'));
     }
+    if (url.pathname === '/studio') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      return res.end(readFileSync('dashboard/studio.html'));
+    }
     if (url.pathname === '/api/summary') return json(res, await summary());
     if (url.pathname.startsWith('/api/task/')) {
       const detail = await taskDetail(decodeURIComponent(url.pathname.slice('/api/task/'.length)));
@@ -164,4 +168,4 @@ createServer(async (req, res) => {
   } catch (e) {
     json(res, { error: (e as Error).message }, 500);
   }
-}).listen(PORT, '127.0.0.1', () => console.log(`Agent Task Escrow dashboard: http://localhost:${PORT}`));
+}).listen(PORT, '127.0.0.1', () => console.log(`AgentPact dashboard: http://localhost:${PORT}`));

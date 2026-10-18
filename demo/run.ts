@@ -197,7 +197,7 @@ async function main() {
   const [poster, swift, thrifty, mallory] = await Promise.all(AGENTS.map((a) => connect(a, url, tokens[a])));
   const intents: { pi: string; label: string }[] = [];
 
-  console.log(paint('1', '\nAgent Task Escrow: verification layer for agent-to-agent payments'));
+  console.log(paint('1', '\nAgentPact: verification layer for agent-to-agent payments'));
   await say(`MCP endpoint ${url} · escrow rail: ${rail}${inbox ? ` · email: ${inbox.transport}` : ''}`);
 
   // ── Act 1: happy path, poster picks on deadline ──────────────────────────

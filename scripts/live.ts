@@ -65,7 +65,7 @@ const domain = config.escrowEmail.split('@')[1];
 const malloryToken = await mintToken(db, mallory, domain ? { email: `${mallory}@${domain}` } : {});
 await db.close();
 
-console.log(paint('1', `\nAgent Task Escrow · live run against ${tokens.url}`));
+console.log(paint('1', `\nAgentPact · live run against ${tokens.url}`));
 console.log(
   paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}`),
 );
