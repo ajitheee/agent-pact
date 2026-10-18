@@ -71,7 +71,7 @@ input { font: inherit; color: var(--text); background: #060a13; border: 1px soli
     <div class="shade"></div>
     <div class="brand"><svg width="44" height="50" viewBox="0 0 44 50" aria-hidden="true"><polygon points="22,2 42,13.5 42,36.5 22,48 2,36.5 2,13.5" fill="#0b1220" stroke="#fbbf24" stroke-width="3"/><circle cx="22" cy="25" r="5" fill="#fbbf24"/></svg>AgentPact<small>escrow for agent work</small></div>
     <div class="lower" id="lower"><b id="lowerName">Ajith</b><span>Building AgentPact · escrow for agent work</span></div>
-    <div id="outro"><h2>Verification is the missing layer of agent payments.</h2><p class="pill">github.com/ajitheee/agent-task-escrow</p></div>
+    <div id="outro"><h2>Verification is the missing layer of agent payments.</h2><p class="pill">github.com/ajitheee/agent-pact</p></div>
   </div>
 
   <div class="scene" id="problem"><div class="slide">
@@ -132,13 +132,13 @@ const LENGTH = 120;
 const LINES = [
   [0, 10, "Hi, I'm {name}. Agents can already pay each other, but nobody checks the work before the money moves. So I built AgentPact."],
   [10, 32, 'Everyone building with agents has seen this. Coding agents game the tests. Data agents write SQL that runs but gives the wrong number. Back-office agents invent figures. So the money waits in escrow, and moves only when a machine check passes.'],
-  [32, 42, "Here's a real run on our production server. A Claude Code agent posts a real bug fix: forty dollars, paid only if the code passes our CI suite and 200 hidden tests."],
-  [42, 54, '{bids}'],
-  [54, 66, 'But Mallory gamed the tests. Her code runs in a Blaxel sandbox, the hidden tests catch it, and the nine dollars go back. The poster pays nothing.'],
-  [66, 74, "Worker A's real fix passes all 208 checks, and twenty-five dollars is paid automatically."],
-  [74, 81, 'This is what the poster got: a patch, ready to merge.'],
-  [81, 94, "Then a monitor audits the whole job, every step and every payment, and flags Mallory. It's saved to memory, so her next identity gets caught too."],
-  [94, 110, 'Any MCP agent can join. Stripe holds the money, Blaxel runs the check, and it already handles code, SQL reports and invoices. No human in the loop.'],
+  [32, 45, "Here's a real run on our production server. A Claude Code agent posts a real bug fix: forty dollars, paid only if the code passes our CI suite and 200 hidden tests."],
+  [45, 57, '{bids}'],
+  [57, 69, 'But Mallory gamed the tests. Her code runs in a Blaxel sandbox, the hidden tests catch it, and the nine dollars go back. The poster pays nothing.'],
+  [69, 77, "Worker A's real fix passes all 208 checks, and twenty-five dollars is paid automatically."],
+  [77, 84, 'This is what the poster got: a patch, ready to merge.'],
+  [84, 97, "Then a monitor audits the whole job, every step and every payment, and flags Mallory. It's saved to memory, so her next identity gets caught too."],
+  [97, 110, 'Any MCP agent can join. Stripe holds the money, Blaxel runs the check, and it already handles code, SQL reports and invoices. No human in the loop.'],
   [110, 120, "Verification is the missing layer of agent payments. I'm {name}, and this is AgentPact. Thank you."],
 ];
 
@@ -194,17 +194,17 @@ async function pickRun() {
 }
 /** Event times inside the replay (seconds after it starts at 0:31), matched to the script lines. */
 function replayCues(d) {
-  const bids = [11, 13, 15, 16, 17], awards = [18, 31], fails = [23.5, 37];
+  const bids = [14, 16, 18, 19, 20], awards = [21, 34], fails = [26.5, 40];
   let b = 0, a = 0, f = 0;
   const events = d.events.map((e, i) => {
     if (e.type === 'posted') return 1.5;
     if (e.type === 'bid' || e.type === 'rebid') return bids[Math.min(b++, bids.length - 1)];
     if (e.type === 'awarded') return awards[Math.min(a++, awards.length - 1)];
     if (e.type === 'failed') return fails[Math.min(f++, fails.length - 1)];
-    if (e.type === 'passed') return 34.5;
-    return 40 + i;
+    if (e.type === 'passed') return 37.5;
+    return 43 + i;
   });
-  return { events, output: 43, audit: 50 };
+  return { events, output: 46, audit: 53 };
 }
 
 const CUES = [
@@ -213,19 +213,19 @@ const CUES = [
   [13, () => reveal('p1')], [16.5, () => reveal('p2')], [21, () => reveal('p3')], [26, () => reveal('p4')],
   [31, () => run && frameWin().studioReplay(run.task.id, replayCues(run))],
   [32, () => { scene('dash'); caption('A real bug · $40 budget · paid only if CI passes'); }],
-  [42, () => { zoom('market'); caption('Agents bid · the cheapest that fits the deadline wins'); }],
-  [49, () => caption('Stripe holds the money · authorized, not moved')],
+  [45, () => { zoom('market'); caption('Agents bid · the cheapest that fits the deadline wins'); }],
+  [52, () => caption('Stripe holds the money · authorized, not moved')],
   // The camera follows the money: the check, the refund, the next hold, the check again, the payout.
-  [54, () => { zoom('sandbox'); caption('The check runs in a Blaxel sandbox, never on the worker'); }],
-  [57.6, () => { zoom('money'); caption('Cheat caught · hold released, the poster pays nothing'); }],
-  [62, () => caption('Next bidder: worker A · Stripe holds the money again')],
-  [65.5, () => { zoom('sandbox'); caption('A real fix · every check passes'); }],
-  [69.3, () => { zoom('market'); caption('Paid automatically · no human in the loop'); }],
-  [74, () => { zoom('output'); caption('The deliverable: a patch, ready to merge'); }],
-  [81, () => { zoom('audit'); caption('Monitor: every step and every payment re-checked'); }],
-  [91, () => { zoom('full'); caption(null); }],
-  [94, () => scene('how')],
-  [96, () => reveal('s1')], [98, () => reveal('s2')], [100, () => reveal('s3')], [102, () => reveal('s4')], [104, () => reveal('s5')], [106, () => reveal('s6')], [108, () => reveal('s7')],
+  [57, () => { zoom('sandbox'); caption('The check runs in a Blaxel sandbox, never on the worker'); }],
+  [60.6, () => { zoom('money'); caption('Cheat caught · hold released, the poster pays nothing'); }],
+  [65, () => caption('Next bidder: worker A · Stripe holds the money again')],
+  [68.5, () => { zoom('sandbox'); caption('A real fix · every check passes'); }],
+  [72.3, () => { zoom('market'); caption('Paid automatically · no human in the loop'); }],
+  [77, () => { zoom('output'); caption('The deliverable: a patch, ready to merge'); }],
+  [84, () => { zoom('audit'); caption('Monitor: every step and every payment re-checked'); }],
+  [94, () => { zoom('full'); caption(null); }],
+  [97, () => scene('how')],
+  [98.5, () => reveal('s1')], [100, () => reveal('s2')], [101.5, () => reveal('s3')], [103, () => reveal('s4')], [104.5, () => reveal('s5')], [106, () => reveal('s6')], [107.5, () => reveal('s7')],
   [110, () => { scene('face'); faceMode('outro'); }],
 ];
 
