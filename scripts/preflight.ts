@@ -2,7 +2,7 @@
 // Each line is ✓ with what was confirmed, or ✗ with what to do about it. Exits 1 if anything failed.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { slugifyDeliverable } from '../clients/slugify.js';
+import { loadScenarios } from '../clients/scenarios.js';
 import { config } from '../src/config.js';
 import { PrimitiveMail } from '../src/email/primitive.js';
 import { Verifiers } from '../src/verifier/index.js';
@@ -84,12 +84,18 @@ await check(
   'Blaxel',
   async () => {
     if (config.verifierSandbox !== 'blaxel') throw new Error('BL_API_KEY is not set in .env');
+    // Every demo scenario: worker A's delivery must pass and Mallory's must fail, inside Blaxel.
     const verifiers = new Verifiers();
-    const spec = await verifiers.prepare({ type: 'python', code: readFileSync('clients/verifiers/slugify.py', 'utf8') });
-    const verdict = await verifiers.run(spec, slugifyDeliverable());
-    if (!verdict.passed) throw new Error(`worker A's slugify failed: ${verdict.reasons[0]}`);
-    if (verdict.sandbox !== 'blaxel') throw new Error('Blaxel was unreachable; the check fell back to the local sandbox');
-    return `the slugify tests pass on worker A's code in Blaxel (${verdict.ms}ms)`;
+    const scenarios = loadScenarios();
+    for (const s of scenarios) {
+      const spec = await verifiers.prepare(s.verifier);
+      const good = await verifiers.run(spec, s.good);
+      if (!good.passed) throw new Error(`${s.name}: worker A's delivery failed: ${good.reasons[0]}`);
+      if (s.verifier.type === 'python' && good.sandbox !== 'blaxel') throw new Error('Blaxel was unreachable; the check fell back to the local sandbox');
+      const bad = await verifiers.run(spec, s.bad);
+      if (bad.passed || !new RegExp(s.badReason).test(bad.reasons[0] ?? '')) throw new Error(`${s.name}: Mallory's delivery didn't fail as expected`);
+    }
+    return `all ${scenarios.length} scenarios behave: worker A passes, Mallory fails, Python checks run in Blaxel`;
   },
   'check BL_WORKSPACE and BL_API_KEY in .env, and the Blaxel console for the escrow-verifier sandbox',
 );
@@ -158,9 +164,9 @@ await check(
 await check(
   'Poster files',
   async () => {
-    const missing = ['.mcp.json', 'clients/poster.md', 'clients/verifiers/slugify.py', 'clients/worker-b.md'].filter((f) => !existsSync(f));
+    const missing = ['.mcp.json', 'clients/poster.md', 'clients/worker-b.md'].filter((f) => !existsSync(f));
     if (missing.length) throw new Error(`missing ${missing.join(', ')}`);
-    return '.mcp.json, the poster brief, the tests and worker B prompt are in place';
+    return '.mcp.json, the poster brief and the worker B prompt are in place';
   },
   'npm run setup:clients -- --url <server>/mcp writes .mcp.json; the other files are in git',
 );

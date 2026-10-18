@@ -1,26 +1,26 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { before, describe, it } from 'node:test';
-import { brokenSlugify, slugifyDeliverable } from '../clients/slugify.js';
+import { loadScenario } from '../clients/scenarios.js';
 import { Verifiers, type VerifierSpec } from '../src/verifier/index.js';
 
-// The poster's test suite (clients/verifiers/slugify.py), run through the real sandbox: the submitted
+// The slugify scenario's tests (clients/scenarios/slugify/verify.py), run through the real sandbox: the submitted
 // code runs in its own child process via run_submission.
 describe('slugify verifier', () => {
   const verifiers = new Verifiers();
+  const scenario = loadScenario('slugify');
   let spec: VerifierSpec;
   before(async () => {
-    spec = await verifiers.prepare({ type: 'python', code: readFileSync('clients/verifiers/slugify.py', 'utf8') });
+    spec = await verifiers.prepare(scenario.verifier);
   });
   const run = (code: string) => verifiers.run(spec, { code });
 
   it("passes worker A's slugify", async () => {
-    const verdict = await verifiers.run(spec, slugifyDeliverable());
+    const verdict = await verifiers.run(spec, scenario.good);
     assert.deepEqual([verdict.passed, verdict.reasons], [true, []]);
   });
 
   it("fails Mallory's slugify on punctuation (the failure beat)", async () => {
-    const verdict = await verifiers.run(spec, brokenSlugify());
+    const verdict = await verifiers.run(spec, scenario.bad);
     assert.equal(verdict.passed, false);
     assert.match(verdict.reasons[0], /slugify\('Hello, World!'\) returned 'hello,-world!', expected 'hello-world'/);
   });
@@ -31,7 +31,7 @@ def slugify(title):
     return ANSWERS.get(title, "")`;
     const verdict = await run(table);
     assert.equal(verdict.passed, false);
-    assert.match(verdict.reasons[0], /returned '', expected '[a-z0-9]/);
+    assert.match(verdict.reasons[0], /^hidden test: slugify\(.*\) returned '', expected '[a-z0-9]/);
   });
 
   it("can't reach the verifier: rewriting the runner only changes the submission's own process", async () => {

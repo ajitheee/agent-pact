@@ -1,0 +1,11 @@
+{
+  "order": 1,
+  "title": "Write slugify()",
+  "kind": "code",
+  "need": "a function written",
+  "capability": "code.python",
+  "check": "It runs the delivered code in its own sandboxed process against 9 fixed examples plus 25 random titles generated at check time, so code that only looks finished, or answers hardcoded from the examples, fails.",
+  "strength": "verifies correctness with hidden random tests",
+  "mallory": "code that only looks finished: it swaps spaces for hyphens and leaves the punctuation in",
+  "bad_reason": "slugify\\('Hello, World!'\\) returned 'hello,-world!'"
+}

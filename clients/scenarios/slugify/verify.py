@@ -1,3 +1,4 @@
+# scenario: slugify
 import random
 import re
 import string
@@ -34,6 +35,8 @@ def verify(payload):
     wanted = [slug for _, slug in EXAMPLES] + [expected(title) for title in fresh]
 
     got = run_submission(payload["code"], "slugify", titles)
-    for title, want, slug in zip(titles, wanted, got):
-        assert slug == want, f"slugify({title!r}) returned {slug!r}, expected {want!r}"
+    for i, (title, want, slug) in enumerate(zip(titles, wanted, got)):
+        # Examples are checked first, so a "hidden test" failure means every public example passed.
+        where = "hidden test: " if i >= len(EXAMPLES) else ""
+        assert slug == want, f"{where}slugify({title!r}) returned {slug!r}, expected {want!r}"
     return True

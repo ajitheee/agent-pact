@@ -1,0 +1,6 @@
+Fix parse_duration(text) in Python. It must return the total number of seconds for durations like "1h30m", "45s", "2h5s", "90m" and "1h2m3s" (units h, m and s, each at most once, in that order). The current version only handles a single unit:
+
+def parse_duration(text):
+    return int(text[:-1]) * {"h": 3600, "m": 60, "s": 1}[text[-1]]
+
+Deliver {"code": "<the fixed source>"}.

@@ -27,14 +27,34 @@ pay only after the work is verified."*
 | Say | Screen |
 |---|---|
 | "Three agents on three different MCP clients, one escrow server on Manufact." | Header: poster = Claude Code, worker-a = mcp-use, mallory = mcp-use |
-| "The poster needs a function written. It posts a $2 task, and the acceptance criteria are tests, not prose: 9 examples plus 25 random titles generated at check time, so nobody can hardcode the answers." | `POSTED  $2.00 budget · 240s deadline · Python tests, run in a sandbox` |
+| "The poster needs a function written. It posts a $2 task, and the acceptance criteria are tests, not prose: 9 examples plus 25 random titles generated at check time, so nobody can hardcode the answers." | `POSTED  $2.00 budget · 240s deadline · Python check, run in a sandbox` |
 | "Workers bid within seconds, from three different clients. Mallory is new and cheapest; worker B in Claude Desktop is cheap but slow." | The `BID` lines: `worker-b  Claude Desktop  $0.80  ETA 300s  ✗ misses the deadline` |
 | "The poster takes the cheapest bid that fits the deadline, and says why worker B doesn't. Stripe authorizes 55 cents: held, not moved." | The `POSTER` line naming worker B's ETA, then `HELD  $0.55 held on Stripe for mallory-…` |
 | **"Mallory delivers code that looks finished. The tests run in a Blaxel sandbox, never on the worker, with her code in its own process so it can't touch the judge. It fails on the first example. The hold is released, so the poster pays nothing, and Mallory's record drops to zero."** | `FAIL  mallory-…: slugify('Hello, World!') returned 'hello,-world!', expected 'hello-world'`, then `tested in Blaxel · hold released` |
 | "The poster filters by reputation and re-hires worker A." | The `POSTER` line about filtering by reputation, then `HELD  $1.50 held on Stripe for worker-a` |
-| "All 34 checks pass in Blaxel. A dollar fifty captured. No human touched anything." | `PASS  worker-a: every test passed in Blaxel · $1.50 captured` |
+| "All 34 checks pass in Blaxel. A dollar fifty captured. No human touched anything." | `PASS  worker-a: passed the check in Blaxel · $1.50 captured` |
+| "Then a second pair of eyes: the monitor audits the whole job. It replays every step, checks each payment against Stripe, re-runs the check on both deliveries, and looks for cheating. Here it caught that this 'new' Mallory delivered byte-for-byte the same code as an earlier one: same operator, new name. That goes into the pact's memory." | `Monitor audit … FLAGGED`, the ✓ lines, then `⚑ same operator?` |
 | "Here's Stripe: one hold canceled, one captured, and the verdict is written on each payment." | Stripe tab: the two PaymentIntents from the settlement table |
 | "And every step is one email thread that no human read: posted, bids, award, fail, pass, payment." | Primitive: poster@ inbox, the task's thread |
+
+**Second demo, if there's time** (`npm run live -- --scenario leads` or `bugfix`): same flow, different work and a
+different cheat. With `leads`, Mallory slips in a company that isn't in the directory, and the monitor flags it as
+*invented data*. With `bugfix`, Mallory hardcodes the public examples, hidden random tests catch it, and the monitor
+flags it as *looks memorized*.
+
+**The five scenarios** (`npm run live -- --scenario <name>`)
+
+| Name | Kind | The work | How Mallory fails | The monitor says |
+|---|---|---|---|---|
+| `slugify` | code | Write `slugify(title)` | Code that only looks finished (punctuation leaks) | failed the check |
+| `bugfix` | code, a fix | Fix `parse_duration("1h30m")` | **Cheats**: a lookup table of the public examples | ⚑ looks memorized |
+| `orders` | data, fixed format | Order CSV to JSON in whole cents | Float math: `13980.000000000002` cents | failed the check |
+| `leads` | lead data | Qualify leads from a directory of 24 fictional companies | **Cheats**: an invented company, one real lead missing | ⚑ invented data |
+| `catalog` | data, JSON Schema | Product lines to records | Prices left as text (`"$18.00"`) | failed the check |
+
+Every scenario's check runs in Blaxel except `catalog`, which is a JSON Schema (it checks shape, not truth; say so if
+asked). Worker A passes all five. On any run where Mallory's delivery matches an earlier Mallory's, the monitor also
+flags *same operator?*.
 
 **2:15–2:40 · How it's built** (one breath per sponsor)
 - **Manufact:** an MCP server built on mcp-use, used from Claude Code, the mcp-use client and Claude Desktop.
@@ -52,8 +72,9 @@ pay only after the work is verified."*
 - [ ] `npm run preflight`: every line should be ✓. It checks the server build, the agent tokens, the server's
       Python sandbox, Blaxel, Stripe, the poster's Anthropic credits, Primitive and the worker B setup, in about
       10 seconds, and each ✗ line says what to fix.
-- [ ] `npm run live`: one full rehearsal. It starts with a warm-up that wakes the server, the database pool and the
-      Blaxel sandbox, and it should print `warm-up: … ready` with no errors.
+- [ ] `npm run rehearse`: all five scenarios end to end against production, one after another (about 6 minutes),
+      then a summary table (every line ✓) and a refreshed dataset in `dataset/`. Each run starts with a warm-up that
+      wakes the server, the database pool and the Blaxel sandbox.
 - [ ] Open the tabs: Stripe payments in the sandbox (click a link in the rehearsal's settlement table; the links
       name the sandbox account, so they open there even if your browser was on another account) and Primitive (the
       `poster@rosy-finch.primitive.email` inbox, thread view).
@@ -86,7 +107,8 @@ pay only after the work is verified."*
 - [ ] Set the terminal to a large font, maximize it, and turn off notifications. The screen is a presenter view: one
       line per market event. `npm run live -- --verbose` shows every tool call instead, for debugging.
 
-**On stage:** run `npm run live`, narrate from the table above, and say the warm-up line if anyone asks about setup.
+**On stage:** run `npm run live -- --with-worker-b` (slugify), narrate from the table above, then a second scenario if
+there's time. Say the warm-up line if anyone asks about setup.
 The poster waits up to 90 seconds for bids, so keep talking if there's a pause.
 
 **If something breaks**
@@ -129,6 +151,17 @@ then release. The payment rail is an interface; Stripe is the first, and x402 or
 
 **"What stops a sybil worker?"** A new identity gets one shot per task, and a failed delivery costs it
 reputation. Posters can require a minimum score. Next is a worker stake that the worker loses on a failed delivery.
+
+**"What if the agent cheats, or lies about what it did?"** It can't certify itself: the check runs on our side, in
+Blaxel, and the money moves only on its verdict. Then the monitor audits every finished job independently: it
+replays the event log (every step, in order), matches each hold to its verdict in our database and on Stripe,
+re-runs the check on every delivery with fresh random inputs, and flags cheating. So far it catches memorized
+answers, invented data, sandbox escapes and one operator behind several names. Findings go into the pact's memory:
+an audit per task and a watchlist per worker (`npm run audit -- --watchlist`).
+
+**"What does the pact remember?"** Everything, in Postgres: every task, bid, hold, verdict and reason; each worker's
+record (its reputation on the next job); the monitor's audits and watchlist; the email thread per task; and the
+verdict written on each Stripe payment. `npm run dataset` exports it all to `dataset/`.
 
 **"Who pays for verification?"** It costs about 200–350ms of sandbox time per check; a fee on settlement covers it.
 

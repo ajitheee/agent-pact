@@ -7,6 +7,9 @@
 //   poster          Claude Code: posts the task, picks the cheapest bid that fits the deadline (Mallory), sees
 //                   her fail and get refunded, filters by reputation, re-awards to worker A, who gets paid.
 //
+//   npm run live -- --scenario leads  picks the task from clients/scenarios/ (slugify, bugfix, orders, leads, catalog);
+//                   Mallory's delivery fails a different way in each. Default: slugify.
+//
 //   npm run live -- --with-worker-b   adds the third client: worker B in Claude Desktop (escrow-worker-b server).
 //                   Its prompt goes on the clipboard. Paste and send it before the poster starts: worker B
 //                   long-polls list_open_tasks, so it bids as soon as the task exists. The poster waits for
@@ -15,7 +18,7 @@
 // The screen is a presenter view: one line per market event (posted, bids, Stripe holds, verdicts), read from the
 // escrow's own event log, plus the poster's one-line decisions. --verbose shows every tool call and worker log instead.
 import { spawn, type ChildProcess } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createInterface as createPrompt } from 'node:readline/promises';
 import { mintToken } from '../src/agents.js';
@@ -24,10 +27,16 @@ import { openDb, type EventRow } from '../src/db.js';
 import { newId } from '../src/ids.js';
 import { usd } from '../src/market.js';
 import { stripeDashboardBase } from '../src/rails.js';
+import { loadScenario } from '../clients/scenarios.js';
+import { auditTask, formatAudit } from '../src/audit.js';
 
 const tokens = JSON.parse(readFileSync('clients/tokens.local.json', 'utf8')) as Record<string, string>;
 const withWorkerB = process.argv.includes('--with-worker-b');
 const verbose = process.argv.includes('--verbose');
+const flag = (name: string) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined);
+const scenario = loadScenario(flag('--scenario') ?? 'slugify');
+/** The task this run's poster posted, read from its post_task result, so back-to-back runs never mix up tasks. */
+const runTask: { id?: string } = {};
 const paint = (code: string, s: string) => `\x1b[${code}m${s}\x1b[0m`;
 const started = Date.now();
 const clock = () => paint('2', `${String(Math.round((Date.now() - started) / 1000)).padStart(4)}s`);
@@ -45,8 +54,9 @@ await db.close();
 
 console.log(paint('1', `\nAgent Task Escrow · live run against ${tokens.url}`));
 console.log(
-  paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}\n`),
+  paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)${withWorkerB ? ' · worker-b = Claude Desktop' : ''}`),
 );
+console.log(paint('2', `scenario ${scenario.order}: ${scenario.title} (${scenario.kind}) · ${scenario.strength}\n`));
 if (!verbose) console.log(paint('2', 'presenter view: one line per market event. Add --verbose to see every tool call.\n'));
 await warmUp();
 if (withWorkerB) await readyWorkerB();
@@ -133,6 +143,7 @@ const workerView: View = (text) => (verbose || /connect attempt|submit failed|sk
 function posterView(): View {
   let summary = false;
   return (text) => {
+    runTask.id ??= /"task_id":"(t_[0-9a-z]+)","status":"open"/.exec(text)?.[1];
     if (verbose) return text;
     if (!text.trim()) summary = true; // the closing summary follows a blank line; the settlement table covers it
     else if (!summary && /^  \S/.test(text)) say('POSTER', '36', `"${clip(text.trim(), 150)}"`);
@@ -157,7 +168,7 @@ if (!withWorkerB) {
   workers = Promise.all([startWorkerA(), startMallory()]);
   await new Promise((r) => setTimeout(r, 4000)); // let both workers connect before the task exists
 }
-const posterProcess = node(['scripts/run-poster.mjs', '--stream'], withWorkerB ? { POSTER_MIN_BIDS: '3' } : {});
+const posterProcess = node(['scripts/run-poster.mjs', '--stream'], { POSTER_SCENARIO: scenario.name, ...(withWorkerB ? { POSTER_MIN_BIDS: '3' } : {}) });
 const poster = attach('poster', '36', posterProcess, /^\[poster\] /, posterView());
 if (withWorkerB) {
   workers = cueWorkerB(posterProcess).then(() => Promise.all([startWorkerA(), startMallory()]));
@@ -173,11 +184,8 @@ async function watchEvents() {
   for (;;) {
     // Decide before reading, so the events written just before the poster exits still show.
     const last = !watching.on;
-    if (!task) {
-      [task] = await watch.query<{ id: string; spec: string; deadline_at: number }>(
-        "SELECT id, spec, deadline_at FROM tasks WHERE poster_id = 'poster' AND created_at >= $1 ORDER BY created_at LIMIT 1",
-        [started - 30_000],
-      );
+    if (!task && runTask.id) {
+      [task] = await watch.query<{ id: string; spec: string; deadline_at: number }>('SELECT id, spec, deadline_at FROM tasks WHERE id = $1', [runTask.id]);
     }
     if (task) {
       for (const e of await watch.query<EventRow>('SELECT * FROM events WHERE task_id = $1 AND seq > $2 ORDER BY seq', [task.id, after])) {
@@ -194,11 +202,12 @@ async function watchEvents() {
 function showEvent(task: { spec: string; deadline_at: number }, e: EventRow) {
   const d = JSON.parse(e.data) as Record<string, any>;
   const client = (w: string) => (w === 'worker-b' ? 'Claude Desktop' : w.startsWith('mallory') ? 'mcp-use client, new' : 'mcp-use client');
-  const where = (s?: string) => (s === 'blaxel' ? 'Blaxel' : s === 'local' ? 'the local sandbox' : 'the sandbox');
+  // Python checks run in a sandbox; a JSON Schema check runs no code, so the escrow server validates it directly.
+  const where = (s?: string) => (s === 'blaxel' ? 'in Blaxel' : s === 'local' ? 'in the local sandbox' : 'by the escrow server');
   const left = Math.round((task.deadline_at - e.at) / 1000);
   switch (e.type) {
     case 'posted':
-      say('POSTED', '36', `${usd(d.budget_max)} budget · ${left}s deadline · ${d.verifier_type === 'python' ? 'Python tests, run in a sandbox' : 'JSON Schema check'}`);
+      say('POSTED', '36', `${usd(d.budget_max)} budget · ${left}s deadline · ${d.verifier_type === 'python' ? 'Python check, run in a sandbox' : 'JSON Schema check'}`);
       return console.log(INDENT + paint('2', `"${clip(task.spec, 110)}"`));
     case 'bid':
     case 'rebid': {
@@ -208,10 +217,10 @@ function showEvent(task: { spec: string; deadline_at: number }, e: EventRow) {
     case 'awarded':
       return say('HELD', '33', `${usd(d.price)} held on Stripe for ${d.worker} · authorized, not moved`);
     case 'failed':
-      say('FAIL', '31', `${e.actor}: ${d.reason}`);
-      return console.log(INDENT + paint('2', `tested in ${where(d.sandbox)} · hold released, the poster pays nothing`));
+      say('FAIL', '31', `${e.actor}: ${clip(d.reason, 110)}`);
+      return console.log(INDENT + paint('2', `checked ${where(d.sandbox)} · hold released, the poster pays nothing`));
     case 'passed':
-      return say('PASS', '32', `${e.actor}: every test passed in ${where(d.sandbox)} · ${usd(d.amount)} captured`);
+      return say('PASS', '32', `${e.actor}: passed · checked ${where(d.sandbox)} · ${usd(d.amount)} captured`);
     case 'timed_out':
       return say('LATE', '31', `${d.worker} missed the deadline · hold released`);
     case 'expired':
@@ -249,12 +258,9 @@ for (const c of children) if (c.exitCode === null) c.kill();
 watching.on = false;
 await events;
 
-// Settlement, straight from the database: every escrow hold on the task this run posted (30s of slack for clock skew).
+// Settlement, straight from the database: every escrow hold on the task this run posted.
 const summary = await openDb();
-const [task] = await summary.query<{ id: string; status: string }>(
-  "SELECT id, status FROM tasks WHERE poster_id = 'poster' AND created_at >= $1 ORDER BY created_at DESC LIMIT 1",
-  [started - 30_000],
-);
+const [task] = runTask.id ? await summary.query<{ id: string; status: string }>('SELECT id, status FROM tasks WHERE id = $1', [runTask.id]) : [];
 if (!task) console.log(paint('31', '\nThe poster did not post a task in this run; see its output above.'));
 if (task) {
   console.log(paint('1', `\nSettlement for ${task.id} (${task.status})`));
@@ -266,9 +272,18 @@ if (task) {
   for (const a of attempts) {
     const verdict = a.outcome === 'passed' ? paint('32', 'PASS') : paint('31', a.outcome.toUpperCase());
     console.log(`  ${a.worker_id.padEnd(13)} ${usd(a.amount).padStart(6)}  ${verdict}  escrow ${a.escrow.padEnd(9)} ${dashboard}/payments/${a.payment_intent}`);
-    if (a.reason) console.log(paint('2', `  ${''.padEnd(13)} ${a.reason}`));
+    if (a.reason) console.log(paint('2', `  ${''.padEnd(13)} ${clip(a.reason, 150)}`));
+  }
+  // The monitor: an independent audit of the steps, the money and every delivery, saved in the pact's memory.
+  console.log('');
+  try {
+    for (const line of formatAudit(await auditTask(summary, task.id), paint)) console.log(line);
+  } catch (e) {
+    console.log(paint('33', `Monitor audit could not finish: ${(e as Error).message}. Run npm run audit -- ${task.id}`));
   }
 }
 await summary.close();
+// npm run rehearse reads which task this run posted from here.
+if (process.env.LIVE_TASK_FILE && task) writeFileSync(process.env.LIVE_TASK_FILE, task.id);
 console.log(paint('2', `\nDone in ${Math.round((Date.now() - started) / 1000)}s.`));
 process.exit(posterExit);

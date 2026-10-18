@@ -1,0 +1,8 @@
+Turn these 6 product lines into JSON records: [{"sku", "name", "price_cents", "currency", "in_stock"}]. sku looks like ABC-123, price_cents is an integer, currency is "USD" or "EUR", in_stock is true or false.
+
+ABC-101 | Trail Bottle 750ml | $18.00 | in stock
+ABC-102 | Camp Mug | $12.50 | out of stock
+DEF-210 | Headlamp 300lm | $34.99 | in stock
+DEF-211 | Spare Batteries (4) | $6.75 | in stock
+GHI-305 | Rain Shell | €89.00 | in stock
+GHI-306 | Packable Down Vest | €119.00 | out of stock

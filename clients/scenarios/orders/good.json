@@ -1,0 +1,55 @@
+{
+  "orders": [
+    {
+      "order_id": "A-1001",
+      "customer": "Northwind",
+      "total_cents": 2697
+    },
+    {
+      "order_id": "A-1002",
+      "customer": "Contoso",
+      "total_cents": 4950
+    },
+    {
+      "order_id": "A-1003",
+      "customer": "Fabrikam",
+      "total_cents": 17980
+    },
+    {
+      "order_id": "A-1004",
+      "customer": "Northwind",
+      "total_cents": 13980
+    },
+    {
+      "order_id": "A-1005",
+      "customer": "Litware",
+      "total_cents": 6499
+    },
+    {
+      "order_id": "A-1006",
+      "customer": "Contoso",
+      "total_cents": 6050
+    },
+    {
+      "order_id": "A-1007",
+      "customer": "Adatum",
+      "total_cents": 5997
+    },
+    {
+      "order_id": "A-1008",
+      "customer": "Fabrikam",
+      "total_cents": 14670
+    },
+    {
+      "order_id": "A-1009",
+      "customer": "Litware",
+      "total_cents": 14900
+    },
+    {
+      "order_id": "A-1010",
+      "customer": "Adatum",
+      "total_cents": 11470
+    }
+  ],
+  "revenue_cents": 99193
+}

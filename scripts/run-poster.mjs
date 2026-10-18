@@ -28,8 +28,20 @@ console.log(
     (process.env.ANTHROPIC_WORKSPACE_ID ? ` (workspace ${process.env.ANTHROPIC_WORKSPACE_ID})` : ''),
 );
 const child = spawn(exe, args, { stdio: ['pipe', stream ? 'pipe' : 'inherit', 'inherit'] });
+// The brief is a template; POSTER_SCENARIO (default slugify) picks the task from clients/scenarios/.
+const scenario = process.env.POSTER_SCENARIO ?? 'slugify';
+const dir = `clients/scenarios/${scenario}`;
+const meta = JSON.parse(readFileSync(`${dir}/scenario.json`, 'utf8'));
+const verifier = existsSync(`${dir}/verify.py`)
+  ? `{"type":"python","code":<the full contents of ${dir}/verify.py, verbatim>}. Read that file and pass its text as \`code\` exactly as written.`
+  : `{"type":"json_schema","schema":<the JSON object in ${dir}/schema.json, exactly as written>}. Read that file.`;
+let brief = readFileSync('clients/poster.md', 'utf8')
+  .replaceAll('{{NEED}}', meta.need)
+  .replaceAll('{{SPEC_FILE}}', `${dir}/spec.txt`)
+  .replaceAll('{{CAPABILITY}}', meta.capability)
+  .replaceAll('{{VERIFIER}}', verifier)
+  .replaceAll('{{CHECK}}', meta.check);
 // POSTER_MIN_BIDS=3 (set by `npm run live -- --with-worker-b`) makes the poster wait for a third bid from Claude Desktop.
-let brief = readFileSync('clients/poster.md', 'utf8');
 const minBids = Number(process.env.POSTER_MIN_BIDS ?? 2);
 if (minBids !== 2) brief = brief.replace('`wait_for_bids` 2', `\`wait_for_bids\` ${minBids}`).replaceAll('2 pending bids', `${minBids} pending bids`);
 child.stdin.end(brief);
@@ -52,7 +64,8 @@ function render(line) {
       if (b.type === 'tool_use') {
         const tool = b.name.replace(/^mcp__escrow__/, '');
         // The verifier code is long; show its type, not its body.
-        const input = b.input?.verifier?.code ? { ...b.input, verifier: { type: b.input.verifier.type, code: '<slugify.py>' } } : b.input;
+        const v = b.input?.verifier;
+        const input = v?.code || v?.schema ? { ...b.input, verifier: { type: v.type, [v.code ? 'code' : 'schema']: `<${scenario} check>` } } : b.input;
         console.log(`→ ${tool} ${clip(JSON.stringify(input), 140)}`);
       } else if (b.type === 'text' && b.text.trim() && b.text.length < 400) {
         // Short asides narrate decisions; the long final summary is printed in full by the result event.

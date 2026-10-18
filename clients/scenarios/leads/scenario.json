@@ -1,0 +1,11 @@
+{
+  "order": 4,
+  "title": "Qualify leads from a directory",
+  "kind": "leads",
+  "need": "a qualified lead list",
+  "capability": "data.leads",
+  "check": "It knows exactly which of the 24 directory companies qualify (dev tools, based in Europe, 50+ employees), so an invented, unqualified or missing lead fails.",
+  "strength": "verifies every lead against the source directory",
+  "mallory": "a cheat: a plausible-looking lead that isn't in the directory, and one real lead left out",
+  "bad_reason": "Flintlock Labs is not in the directory: invented lead"
+}

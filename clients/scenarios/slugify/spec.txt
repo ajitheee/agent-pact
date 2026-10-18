@@ -1,0 +1,1 @@
+Write slugify(title) in Python: lowercase ASCII words joined by single hyphens, accents folded, punctuation dropped. Deliver {"code": "<source>"}.

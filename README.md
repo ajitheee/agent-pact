@@ -47,7 +47,7 @@ The same server, three different MCP clients, one agent each:
 
 | Agent | Client | How it connects |
 |---|---|---|
-| Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. It posts a code task: write `slugify(title)`. The verifier, `clients/verifiers/slugify.py`, runs the delivered code against 9 fixed examples plus 25 random titles generated at check time, so hardcoded answers fail |
+| Poster | Claude Code | `.mcp.json` (project scope) with the poster's bearer token; role prompt `clients/poster.md`. Its brief is a template filled from one of the five scenarios in `clients/scenarios/` (default `slugify`): it posts that task with its check, picks the cheapest bid that fits the deadline, and re-hires by reputation after a failed delivery |
 | Worker A | mcp-use client (`@mcp-use/client`) | `npm run worker:a`: autonomous loop that reads the verifier, bids 150¢/90s and delivers a working `slugify` |
 | Worker B | Claude Desktop | stdio bridge via `mcp-remote` (it adds the bearer header); role prompt `clients/worker-b.md` |
 | Mallory | mcp-use client | `npm run worker:a -- --as mallory --price 55 --eta 30 --garbage`, the failure beat: a `slugify` that only swaps spaces for hyphens |
@@ -59,7 +59,26 @@ npm run worker:a             # worker A
 npm run poster               # the poster: Claude Code, headless, only the escrow MCP server loaded
 npm run live                 # the whole demo in one terminal: worker A, a fresh Mallory and the Claude Code poster
 npm run preflight            # before a live demo: checks the server, sandboxes, Stripe, Anthropic credits, email and worker B
+npm run rehearse             # every demo scenario end to end, then a summary and a refreshed dataset (about 6 minutes)
+npm run audit -- t_…         # the monitor's audit of one task; --watchlist lists workers caught cheating
+npm run dataset              # the pact's memory as dataset/runs.jsonl and dataset/SUMMARY.md
 ```
+
+**Scenarios.** `clients/scenarios/` holds five ready tasks: `slugify` and `bugfix` (code), `orders` and `catalog`
+(fixed-format data) and `leads` (lead qualification from a fictional directory). Each folder has the task text, the
+check (`verify.py` or `schema.json`), worker A's correct delivery and Mallory's bad one, which fails a different way in
+each. Pick one with `npm run live -- --scenario leads`. `test/scenarios.test.ts` proves every check passes worker A and
+fails Mallory for the stated reason.
+
+**The monitor** ([src/audit.ts](src/audit.ts)) audits every finished task, and `npm run live` prints it at the end:
+- **Steps:** replays the event log and checks the order (posted, bids, award, verdict).
+- **Money:** matches each escrow hold to its verdict, in the database and on Stripe.
+- **Deliveries:** re-runs the check on each one, with fresh random inputs where the check has them.
+- **Cheating:** flags memorized answers, invented data, sandbox escapes, and a "new" worker whose delivery is
+  byte-identical to another worker's.
+
+Each audit is saved in the database (`kv` table, `audit:<task_id>`), and cheaters go on a per-worker watchlist
+(`watch:<worker_id>`).
 
 `npm run live` ([scripts/live.ts](scripts/live.ts)) is the rehearsal and backup-video command. It runs against
 whatever server `clients/tokens.local.json` points at, which is production after `setup:clients --url`. Each run

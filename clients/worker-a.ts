@@ -8,14 +8,14 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { MCPClient } from '@mcp-use/client';
 import { deliverable, garbage } from './contacts.js';
-import { brokenSlugify, isSlugifyTask, slugifyDeliverable } from './slugify.js';
+import { loadScenario, scenarioOf } from './scenarios.js';
 
 const { values: opts } = parseArgs({
   options: {
     as: { type: 'string', default: 'worker-a' },
     price: { type: 'string', default: '150' },
     eta: { type: 'string', default: '90' },
-    capability: { type: 'string', default: 'code' },
+    capability: { type: 'string', default: '' }, // empty: every task, whatever its capability
     garbage: { type: 'boolean', default: false },
     once: { type: 'boolean', default: false }, // exit after the first settled task
   },
@@ -51,10 +51,10 @@ async function call<T = any>(tool: string, args: Record<string, unknown>): Promi
 
 const bidOn = new Set<string>();
 let cursor: number | undefined;
-log(`connected to ${tokens.url}; watching capability "${opts.capability}"`);
+log(`connected to ${tokens.url}; watching ${opts.capability ? `capability "${opts.capability}"` : 'every task'}`);
 
 for (;;) {
-  const page = await call('list_open_tasks', { capability: opts.capability, ...(cursor !== undefined ? { since: cursor } : {}) });
+  const page = await call('list_open_tasks', { ...(opts.capability ? { capability: opts.capability } : {}), ...(cursor !== undefined ? { since: cursor } : {}) });
   cursor = page.cursor;
 
   for (const t of page.tasks) {
@@ -79,9 +79,9 @@ for (;;) {
     if (!c.awarded_to_you) continue;
     const task = await call('get_task', { task_id: c.task_id });
     log(`awarded ${c.task_id}; escrow ${task.escrow?.payment_intent} held. Building the deliverable${opts.garbage ? ' (garbage)' : ''}…`);
-    const payload = isSlugifyTask(task.verifier)
-      ? opts.garbage ? brokenSlugify() : slugifyDeliverable()
-      : opts.garbage ? garbage() : deliverable(task.verifier);
+    // A demo scenario's task gets that scenario's prepared delivery; anything else falls back to contacts.
+    const scenario = scenarioOf(task.verifier);
+    const payload = scenario ? loadScenario(scenario)[opts.garbage ? 'bad' : 'good'] : opts.garbage ? garbage() : deliverable(task.verifier);
     try {
       const verdict = await call('submit_work', { task_id: c.task_id, payload });
       log(`verdict ${verdict.verdict.toUpperCase()}${verdict.reasons ? ` (${verdict.reasons[0]})` : ''} · verified in ${verdict.verified_in ?? "?"} · escrow ${verdict.escrow.action} · my record ${verdict.record}`);
