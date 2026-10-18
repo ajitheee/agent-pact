@@ -49,10 +49,14 @@ export function createEscrowServer(opts: { market?: Market; requestLog?: boolean
     logging: { enabled: opts.requestLog ?? true },
   });
 
-  // Every MCP request is made by a registered agent; its id flows to the tools via ctx.get('agentId').
+  // Agents authenticate with a bearer token; its agent id flows to the tools via ctx.get('agentId').
+  // With no token at all, the MCP handshake and tool listing still work (health checks, discovery),
+  // but every tool call answers not_authenticated. A token that doesn't match an agent gets a 401.
   server.use('/mcp', async (c, next) => {
     if (c.req.method !== 'POST') return next();
-    const token = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '')?.[1]?.trim();
+    const header = c.req.header('authorization');
+    if (!header) return next();
+    const token = /^Bearer\s+(.+)$/i.exec(header)?.[1]?.trim();
     const market = await getMarket();
     const agent = token ? await agentForToken(market.db, token) : undefined;
     if (!agent) {

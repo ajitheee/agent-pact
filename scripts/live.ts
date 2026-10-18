@@ -29,6 +29,42 @@ await db.close();
 
 console.log(paint('1', `\nAgent Task Escrow · live run against ${tokens.url}`));
 console.log(paint('2', `poster = Claude Code · worker-a = mcp-use client · ${mallory} = mcp-use client (fresh, cheapest, junk)\n`));
+await warmUp();
+
+/**
+ * Wake the server, its database pool and the Python sandbox before the cameras roll. A Python verifier
+ * without verify() runs in the real sandbox but is rejected at post time, so no task or email is created.
+ */
+async function warmUp() {
+  const t0 = Date.now();
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      const res = await fetch(tokens.url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          'mcp-protocol-version': '2025-06-18',
+          authorization: `Bearer ${tokens.poster}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'post_task', arguments: { spec: 'warm-up', budget_max: 50, deadline: 30, verifier: { type: 'python', code: 'warm_up = True' } } },
+        }),
+      });
+      if ((await res.text()).includes('must define a function verify')) {
+        console.log(paint('2', `warm-up: server, database and Python sandbox ready (${Date.now() - t0}ms)\n`));
+        return;
+      }
+    } catch {
+      /* retry below */
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  console.log(paint('33', 'warm-up: the server did not confirm its Python sandbox; continuing anyway\n'));
+}
 
 const node = (args: string[], env: Record<string, string> = {}) =>
   spawn(process.execPath, ['--env-file-if-exists=.env', '--disable-warning=ExperimentalWarning', ...args], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });

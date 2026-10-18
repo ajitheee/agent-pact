@@ -30,6 +30,17 @@ Connect an agent, for example Claude Code:
 claude mcp add --transport http escrow https://<escrow-host>/mcp --header "Authorization: Bearer agt_…"
 ```
 
+Auth works like this:
+- **No token:** the MCP handshake and `tools/list` still work, so health checks and discovery succeed, but every
+  tool call answers `not_authenticated`.
+- **Unknown token:** `401`.
+- **Every tool call** runs as the agent its token belongs to.
+
+Database connections that the network dropped while the host was idle are retried. A transaction is retried only
+if its first statement failed, so a Stripe hold can't happen twice.
+
+The demo-day pitch script, runbook and Q&A prep are in [docs/DEMO.md](docs/DEMO.md).
+
 ## Multi-client demo
 
 The same server, three different MCP clients, one agent each:

@@ -178,16 +178,49 @@ export async function openDb(opts: { url?: string | null; dir?: string | null } 
   return db;
 }
 
+/** A pooled connection the network dropped while the host sat idle; the next attempt gets a fresh one. */
+function isDroppedConnection(e: unknown) {
+  const code = (e as { code?: string })?.code ?? '';
+  return ['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'CONNECTION_CLOSED', 'CONNECTION_ENDED', 'CONNECTION_DESTROYED'].includes(code) || /ECONNRESET|Connection terminated/i.test(String(e));
+}
+
 function postgresDb(url: string): Db {
   // prepare:false keeps Supabase's transaction pooler (port 6543) happy.
   const sql = postgres(url, { prepare: false, max: 5, idle_timeout: 20, onnotice: () => {} });
-  const wrap = (s: postgres.Sql | postgres.TransactionSql): Queryable => ({
-    query: async <T>(text: string, params: unknown[] = []) => (await s.unsafe(text, params as postgres.ParameterOrJSON<never>[])) as unknown as T[],
-  });
+  const run = <T>(s: postgres.Sql | postgres.TransactionSql, text: string, params: unknown[]) =>
+    s.unsafe(text, params as postgres.ParameterOrJSON<never>[]) as unknown as Promise<T[]>;
   return {
     kind: 'postgres',
-    ...wrap(sql),
-    tx: <T>(fn: (q: Queryable) => Promise<T>) => sql.begin((t) => fn(wrap(t))) as Promise<T>,
+    // Plain queries are retried on a dropped connection (each pooled connection can be stale after idling).
+    query: async <T>(text: string, params: unknown[] = []) => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await run<T>(sql, text, params);
+        } catch (e) {
+          if (attempt >= 3 || !isDroppedConnection(e)) throw e;
+        }
+      }
+    },
+    // A transaction is retried only when its first statement hit a dead connection: nothing in it
+    // (a Stripe hold, say) can have run yet, so the retry cannot double-apply anything.
+    tx: async <T>(fn: (q: Queryable) => Promise<T>) => {
+      for (let attempt = 1; ; attempt++) {
+        let started = false;
+        try {
+          return (await sql.begin((t) =>
+            fn({
+              query: async <R>(text: string, params: unknown[] = []) => {
+                const rows = await run<R>(t, text, params);
+                started = true;
+                return rows;
+              },
+            }),
+          )) as T;
+        } catch (e) {
+          if (started || attempt >= 3 || !isDroppedConnection(e)) throw e;
+        }
+      }
+    },
     close: () => sql.end(),
   };
 }
