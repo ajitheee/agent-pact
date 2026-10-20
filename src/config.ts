@@ -27,6 +27,7 @@ export const LIMITS = {
   maxSpecChars: 8_000,
   maxPayloadBytes: 256 * 1024,
   maxPythonChars: 20_000,
+  maxAllowedFiles: 100,
   minDeadlineSeconds: 30,
   maxDeadlineSeconds: 7 * 86_400, // card authorizations lapse after ~7 days
 };

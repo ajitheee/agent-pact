@@ -13,9 +13,11 @@ import { RUNNER_PY } from './runner.js';
 
 const addFormats = createRequire(import.meta.url)('ajv-formats') as (ajv: Ajv) => Ajv;
 
-export type VerifierSpec =
+/** allowed_files: the job's file scope. The delivery must be {"files": {path: text}} and touch only these paths. */
+export type VerifierSpec = (
   | { type: 'json_schema'; schema: Record<string, unknown> }
-  | { type: 'python'; code: string };
+  | { type: 'python'; code: string }
+) & { allowed_files?: string[] };
 
 export interface Verdict {
   passed: boolean;
@@ -42,6 +44,7 @@ export class Verifiers {
   /** Validate a poster-supplied verifier at post time so mistakes surface before money moves. */
   async prepare(input: unknown): Promise<VerifierSpec> {
     const v = (input ?? {}) as Record<string, unknown>;
+    const scope = fileScope(v.allowed_files);
     if (v.type === 'json_schema') {
       let schema = v.schema;
       if (typeof schema === 'string') {
@@ -55,7 +58,7 @@ export class Verifiers {
       } catch (e) {
         throw new AgentError('invalid_verifier', { verifier_type: 'json_schema', detail: (e as Error).message }, 'Fix the schema; it must compile as JSON Schema (draft-07, 2019-09 or 2020-12).');
       }
-      return { type: 'json_schema', schema: schema as Record<string, unknown> };
+      return { type: 'json_schema', schema: schema as Record<string, unknown>, ...scope };
     }
     if (v.type === 'python') {
       if (typeof v.code !== 'string' || !v.code.trim()) {
@@ -68,7 +71,7 @@ export class Verifiers {
       if (result.error || !result.reply?.ok) {
         throw new AgentError('invalid_verifier', { verifier_type: 'python', detail: result.error ?? result.reply?.error }, 'Define def verify(payload): that asserts or returns True/False.');
       }
-      return { type: 'python', code: v.code };
+      return { type: 'python', code: v.code, ...scope };
     }
     const looksLikeSchema = typeof v.type === 'string' && JSON_TYPES.has(v.type);
     throw new AgentError(
@@ -80,6 +83,9 @@ export class Verifiers {
 
   async run(spec: VerifierSpec, payload: unknown): Promise<Verdict> {
     const started = Date.now();
+    // File scope first: a file the check never reads must not ride along to the poster.
+    const outOfScope = spec.allowed_files && outsideScope(payload, spec.allowed_files);
+    if (outOfScope) return { passed: false, reasons: [outOfScope], ms: Date.now() - started, sandbox: 'in-process' };
     if (spec.type === 'json_schema') {
       const validate = this.validator(spec.schema);
       const passed = validate(payload) as boolean;
@@ -106,6 +112,31 @@ export class Verifiers {
     }
     return validate;
   }
+}
+
+/** allowed_files, when given, is a list of exact file paths (no globs or folders). */
+function fileScope(files: unknown): { allowed_files?: string[] } {
+  if (files === undefined || files === null) return {};
+  if (!Array.isArray(files) || !files.length || files.length > LIMITS.maxAllowedFiles || !files.every((f) => typeof f === 'string' && f.trim())) {
+    throw new AgentError(
+      'invalid_verifier',
+      { detail: `allowed_files must be a list of 1 to ${LIMITS.maxAllowedFiles} file paths` },
+      'e.g. "allowed_files":["pricing.py"]; leave it out to accept any payload.',
+    );
+  }
+  return { allowed_files: [...new Set(files as string[])] };
+}
+
+/** Why a delivery breaks the job's file scope, or undefined if every file it changes is allowed. */
+function outsideScope(payload: unknown, allowed: string[]): string | undefined {
+  const files = (payload as { files?: unknown } | null)?.files;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) {
+    return `deliver {"files": {"<path>": "<full text>"}}; this job allows only: ${allowed.join(', ')}`.slice(0, 500);
+  }
+  const outside = Object.keys(files).filter((path) => !allowed.includes(path));
+  if (!outside.length) return undefined;
+  const listed = outside.length > 5 ? `${outside.slice(0, 5).join(', ')} and ${outside.length - 5} more` : outside.join(', ');
+  return `delivery changes files outside the job: ${listed}`.slice(0, 500);
 }
 
 /** LLMs often stringify JSON. Parse a string payload when it looks like JSON and the schema doesn't want a string. */

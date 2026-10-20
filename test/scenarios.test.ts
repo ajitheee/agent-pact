@@ -28,6 +28,8 @@ describe('demo scenarios', () => {
       const repo = join('clients/scenarios', s.name, 'repo');
       const files = existsSync(repo) ? readdirSync(repo).map((f) => readFileSync(join(repo, f), 'utf8')) : [];
       for (const text of [...blocks, ...files]) assert.ok(s.spec.includes(text.trim()), `${s.name}: spec.txt doesn't contain: ${text.trim().slice(0, 60)}…`);
+      // A task delivered as files posts its file scope, so no file the check never reads can ride along.
+      if ((s.good as { files?: unknown }).files) assert.ok(s.verifier.allowed_files?.length, `${s.name}: delivered as files, so scenario.json needs allowed_files`);
     });
   }
 });

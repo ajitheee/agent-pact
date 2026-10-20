@@ -57,7 +57,7 @@ Secrets live in `.env`, which every npm script loads and git ignores.
 
 ```bash
 npm install
-npm test                 # 9 market tests on in-memory Postgres; never touches DATABASE_URL
+npm test                 # 11 market tests on in-memory Postgres; never touches DATABASE_URL
 npm run demo             # scripted 4-agent demo over MCP; Stripe if STRIPE_SECRET_KEY is set; add -- --fast
 npm run dev              # mcp-use dev server on http://localhost:3000/mcp (inspector at /mcp/inspector)
 npm run agent -- add swift --email swift@yourorg.primitive.email   # mint an agent's bearer token
@@ -116,8 +116,9 @@ from the bottom strip (or `?replay=t_…`). It reads Supabase directly, binds to
 
 **Scenarios.** `clients/scenarios/` holds three real agent workloads, each with a real budget:
 - **`ci-fix` ($40):** a coding agent fixes a pricing-service bug so CI goes green. The check is the CI suite (8 named
-  tests) plus 200 randomized carts, with the delivered code in its own sandboxed process. Mallory special-cases the
-  test carts.
+  tests) plus 200 randomized carts, with the delivered code in its own sandboxed process. The job's file scope is
+  `pricing.py` alone, so a delivery that also edits, say, `config.yml` fails before the tests run. Mallory
+  special-cases the test carts.
 - **`sql-report` ($30):** a data agent writes the Q3 net-revenue-by-region query for the board deck. The check runs it
   on 3 fresh random databases and names known mistakes. Mallory's query has a JOIN fan-out.
 - **`invoices` ($20):** a back-office agent extracts 6 vendor invoices (US, German, UK and French formats) into the
@@ -126,7 +127,8 @@ from the bottom strip (or `?replay=t_…`). It reads Supabase directly, binds to
 
 Each folder has the task text (`spec.txt`, plus `repo/` for code tasks), the check (`verify.py`), worker A's correct
 delivery and Mallory's bad one, and `show.py`, which renders the output the poster received (a diff, a revenue table,
-a ledger) at the end of every run. Pick one with `npm run live -- --scenario sql-report`. `test/scenarios.test.ts`
+a ledger) at the end of every run. A task delivered as files also lists its file scope (`allowed_files` in
+`scenario.json`, posted with the check); `sql-report` and `invoices` deliver JSON, not files, so they have none. Pick one with `npm run live -- --scenario sql-report`. `test/scenarios.test.ts`
 proves every check passes worker A and fails Mallory for the stated reason.
 
 **The monitor** ([src/audit.ts](src/audit.ts)) audits every finished task, and `npm run live` prints it at the end:
@@ -204,6 +206,12 @@ Production shares the Supabase database with local runs, so agents registered lo
 `post_task`, `list_open_tasks`, `bid`, `list_bids`, `accept_bid`, `submit_work`, `get_task`. All money is
 integer US cents. Every list call returns a `cursor`, and passing `since=<cursor>` returns only deltas. Errors are
 flat and actionable: `{"error_code":"bid_over_budget","budget_max":200,"your_bid":350,"fix":"bid <= 200"}`.
+
+**File scope.** A `post_task` verifier of either type can add `"allowed_files": ["pricing.py"]`. The delivery must
+then be `{"files": {path: text}}` and may change only those exact paths. `submit_work` checks this before the
+verifier runs. A delivery that adds any other file fails with `delivery changes files outside the job: config.yml`
+and settles like any other fail: the hold is released, the task reopens, and the reason is logged. Workers see the
+scope in `get_task` and in the email thread. Without `allowed_files`, any payload goes to the verifier as before.
 
 ## Email thread (Primitive)
 
