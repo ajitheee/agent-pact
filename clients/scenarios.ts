@@ -1,6 +1,7 @@
 // Demo scenarios: ready-made tasks across the kinds of work the escrow can check today. Each folder in
 // clients/scenarios/ holds one task:
-//   scenario.json   title, kind, capability, what the check does, and Mallory's failure (bad_reason, a regex)
+//   scenario.json   title, kind, capability, what the check does, and Mallory's failure (bad_reason, a regex);
+//                   allowed_files, for a task delivered as files, is the file scope posted with the check
 //   spec.txt        the task text the poster posts
 //   verify.py       a Python check (first line "# scenario: <name>"), or schema.json, a JSON Schema titled "scenario:<name>"
 //   good/ | good.py | good.json   worker A's correct delivery (a folder means {"files": {...}}, .py means {"code": <file>})
@@ -26,7 +27,7 @@ export interface Scenario {
   mallory: string;
   badReason: string;
   spec: string;
-  verifier: { type: 'python'; code: string } | { type: 'json_schema'; schema: Record<string, unknown> };
+  verifier: ({ type: 'python'; code: string } | { type: 'json_schema'; schema: Record<string, unknown> }) & { allowed_files?: string[] };
   /** The file the poster reads and posts verbatim as the verifier. */
   verifierFile: string;
   good: unknown;
@@ -50,12 +51,13 @@ export function loadScenario(name: string): Scenario {
         : JSON.parse(read(`${stem}.json`));
   const meta = JSON.parse(read('scenario.json'));
   const python = existsSync(join(dir, 'verify.py'));
+  const scope = meta.allowed_files ? { allowed_files: meta.allowed_files as string[] } : {};
   return {
     name,
     ...meta,
     badReason: meta.bad_reason,
     spec: read('spec.txt').trim(),
-    verifier: python ? { type: 'python', code: read('verify.py') } : { type: 'json_schema', schema: JSON.parse(read('schema.json')) },
+    verifier: python ? { type: 'python', code: read('verify.py'), ...scope } : { type: 'json_schema', schema: JSON.parse(read('schema.json')), ...scope },
     verifierFile: join(dir, python ? 'verify.py' : 'schema.json').replaceAll('\\', '/'),
     good: delivery('good'),
     bad: delivery('bad'),

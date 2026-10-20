@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { loadScenario } from '../clients/scenarios.js';
 import { openDb, type Db } from '../src/db.js';
 import { AgentError } from '../src/errors.js';
 import { Market } from '../src/market.js';
@@ -124,6 +125,43 @@ describe('market', () => {
     const result = await market.submitWork('w1', { task_id, payload: GOOD });
     assert.equal(result.verdict, 'fail');
     assert.deepEqual(result.reasons, ['domains must be distinct']);
+  });
+
+  it('file scope: an extra file fails before the check and releases the hold; the honest fix is paid', async () => {
+    const ciFix = loadScenario('ci-fix');
+    const { task_id } = await post({ spec: ciFix.spec, verifier: ciFix.verifier, budget_max: ciFix.budget, capability: ciFix.capability });
+    const sneaky = await market.bid('sneaky', { task_id, price: 900, eta_seconds: 30 });
+    const honest = await market.bid('w1', { task_id, price: 2500, eta_seconds: 90 });
+    const first = await market.acceptBid('poster', { task_id, bid_id: sneaky.bid_id });
+
+    // The real fix, plus an edit to a file the CI check never reads.
+    const { files } = ciFix.good as { files: Record<string, string> };
+    const result = await market.submitWork('sneaky', { task_id, payload: { files: { ...files, 'config.yml': 'discounts_enabled: false\n' } } });
+    const reason = 'delivery changes files outside the job: config.yml';
+    assert.equal(result.verdict, 'fail');
+    assert.deepEqual(result.reasons, [reason]);
+    assert.equal(result.verified_in, 'in-process', 'rejected before the Python check ran');
+    assert.equal(result.task_status, 'open');
+    assert.equal(rail.intents.get(first.escrow.payment_intent)?.status, 'canceled');
+    const reopened = await market.getTask('poster', { task_id });
+    assert.deepEqual(reopened.verifier.allowed_files, ['pricing.py'], 'workers see the file scope in get_task');
+    assert.equal(reopened.attempts[0].reason, reason);
+    assert.match(reopened.history.at(-1)!, /verifier FAIL \(delivery changes files outside the job: config\.yml\) · escrow released · task reopened/);
+
+    const second = await market.acceptBid('poster', { task_id, bid_id: honest.bid_id });
+    const paid = await market.submitWork('w1', { task_id, payload: ciFix.good });
+    assert.equal(paid.verdict, 'pass');
+    assert.equal(rail.intents.get(second.escrow.payment_intent)?.status, 'succeeded');
+    assert.deepEqual((await market.getTask('poster', { task_id })).deliverable, ciFix.good);
+  });
+
+  it('file scope: must list file paths, and a payload that is not a file map fails', async () => {
+    await rejects(post({ verifier: { ...EMAILS_SCHEMA, allowed_files: [] } }), 'invalid_verifier');
+    await rejects(post({ verifier: { ...EMAILS_SCHEMA, allowed_files: 'notes.md' } }), 'invalid_verifier');
+    const verifiers = new Verifiers();
+    const spec = await verifiers.prepare({ type: 'json_schema', schema: { type: 'object' }, allowed_files: ['notes.md'] });
+    assert.equal((await verifiers.run(spec, { files: { 'notes.md': 'ok' } })).passed, true);
+    assert.deepEqual((await verifiers.run(spec, { notes: 'ok' })).reasons, ['deliver {"files": {"<path>": "<full text>"}}; this job allows only: notes.md']);
   });
 
   it('only the awarded worker can submit, and only the poster can accept', async () => {

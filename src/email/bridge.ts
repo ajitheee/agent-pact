@@ -351,8 +351,9 @@ function renderPosted(task: Awaited<ReturnType<Market['getTask']>>, e: MarketEve
   ].join('\n');
 }
 
-function verifierText(v: { type: string; schema?: unknown; code?: string }) {
-  return v.type === 'python' ? `python:\n${v.code}` : `json_schema: ${JSON.stringify(v.schema)}`;
+function verifierText(v: { type: string; schema?: unknown; code?: string; allowed_files?: string[] }) {
+  const check = v.type === 'python' ? `python:\n${v.code}` : `json_schema: ${JSON.stringify(v.schema)}`;
+  return v.allowed_files ? `Deliver {"files": {...}} changing only: ${v.allowed_files.join(', ')}\n${check}` : check;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);

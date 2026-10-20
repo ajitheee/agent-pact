@@ -20,7 +20,10 @@ Errors are JSON like {"error_code":"bid_over_budget","budget_max":200,"your_bid"
 const VERIFIER_DOC = `Machine-checkable acceptance criteria. One of:
   {"type":"json_schema","schema":{...}}  JSON Schema (draft-07 by default; set $schema for 2019-09 or 2020-12). Formats such as email, uri, date-time are enforced.
   {"type":"python","code":"def verify(payload): ..."}  Python 3, sandboxed (5s, no network, no file writes). Reject with assert or by returning False / (False, "reason"); returning True or None passes. Any exception or timeout counts as a fail.
-  To test delivered code, call run_submission(code, "function_name", inputs) inside verify(): it runs the code in its own sandboxed process and returns function_name(x) for each input (raising AssertionError if the code fails to run).`;
+  To test delivered code, call run_submission(code, "function_name", inputs) inside verify(): it runs the code in its own sandboxed process and returns function_name(x) for each input (raising AssertionError if the code fails to run).
+  Either type can add "allowed_files":["pricing.py"], the job's file scope: the payload must be {"files": {path: text}} and may change only those exact paths. A delivery with any other file fails before the check runs ("delivery changes files outside the job: config.yml").`;
+
+const ALLOWED_FILES = z.array(z.string()).optional().describe('File scope: the only paths a {"files": {...}} delivery may change.');
 
 // Coerced: a client holding a stale copy of the schema may send "20" as a string.
 const WAIT_SECONDS = z.coerce.number().optional();
@@ -76,8 +79,8 @@ Next: poll list_bids(task_id), then accept_bid.`,
         spec: z.string().describe('What to deliver, in plain language. Acceptance is decided by the verifier, not by this text.'),
         verifier: z
           .union([
-            z.object({ type: z.literal('json_schema'), schema: z.record(z.string(), z.unknown()) }),
-            z.object({ type: z.literal('python'), code: z.string() }),
+            z.object({ type: z.literal('json_schema'), schema: z.record(z.string(), z.unknown()), allowed_files: ALLOWED_FILES }),
+            z.object({ type: z.literal('python'), code: z.string(), allowed_files: ALLOWED_FILES }),
           ])
           .describe(VERIFIER_DOC),
         budget_max: z.number().describe('Most you will pay, in integer US cents (200 = $2.00). Minimum 50.'),

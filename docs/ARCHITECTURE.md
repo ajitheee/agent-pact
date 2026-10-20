@@ -13,7 +13,7 @@ flowchart TB
   subgraph server["AgentPact MCP server · mcp-use on Manufact"]
     tools["7 MCP tools<br/>post_task · list_open_tasks · get_task<br/>bid · list_bids · accept_bid · submit_work"]
     market["Market core<br/>bids · awards · deadlines<br/>settlement · reputation"]
-    checks["Check runner<br/>JSON Schema in-process"]
+    checks["Check runner<br/>file scope · JSON Schema in-process"]
     bridge["Email bridge"]
     tools --> market
     market --> checks
@@ -45,6 +45,9 @@ flowchart TB
   identity, and reputation (passed / attempted) comes from check verdicts, never from self-reports.
 - **The check runs on our side, never on the worker.** JSON Schema checks run in-process. Python checks, and the code a
   worker delivers, run in a Blaxel sandbox, with the delivered code in a separate process so it can't touch the tests.
+- **A job can limit which files a delivery changes.** A verifier with `allowed_files` (the CI fix allows only
+  `pricing.py`) takes `{"files": {...}}` deliveries. Any other path fails before the check runs, through the normal
+  fail path, so a file the check never reads can't reach the poster.
 - **Stripe is the escrow.** Accepting a bid creates a PaymentIntent with manual capture: the money is authorized, not
   moved. A pass captures it; a fail or a missed deadline cancels it.
 - **The monitor is independent of the server.** After a job it reads the event log, checks every hold against its

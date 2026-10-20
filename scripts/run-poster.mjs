@@ -32,9 +32,11 @@ const child = spawn(exe, args, { stdio: ['pipe', stream ? 'pipe' : 'inherit', 'i
 const scenario = process.env.POSTER_SCENARIO ?? 'ci-fix';
 const dir = `clients/scenarios/${scenario}`;
 const meta = JSON.parse(readFileSync(`${dir}/scenario.json`, 'utf8'));
+// A task delivered as files also posts its file scope, so a delivery can't change files the check never reads.
+const scope = meta.allowed_files ? `,"allowed_files":${JSON.stringify(meta.allowed_files)}` : '';
 const verifier = existsSync(`${dir}/verify.py`)
-  ? `{"type":"python","code":<the full contents of ${dir}/verify.py, verbatim>}. Read that file and pass its text as \`code\` exactly as written.`
-  : `{"type":"json_schema","schema":<the JSON object in ${dir}/schema.json, exactly as written>}. Read that file.`;
+  ? `{"type":"python","code":<the full contents of ${dir}/verify.py, verbatim>${scope}}. Read that file and pass its text as \`code\` exactly as written.`
+  : `{"type":"json_schema","schema":<the JSON object in ${dir}/schema.json, exactly as written>${scope}}. Read that file.`;
 let brief = readFileSync('clients/poster.md', 'utf8')
   .replaceAll('{{NEED}}', meta.need)
   .replaceAll('{{SPEC_FILE}}', `${dir}/spec.txt`)
@@ -70,7 +72,7 @@ function render(line) {
         const tool = b.name.replace(/^mcp__escrow__/, '');
         // The verifier code is long; show its type, not its body.
         const v = b.input?.verifier;
-        const input = v?.code || v?.schema ? { ...b.input, verifier: { type: v.type, [v.code ? 'code' : 'schema']: `<${scenario} check>` } } : b.input;
+        const input = v?.code || v?.schema ? { ...b.input, verifier: { ...v, [v.code ? 'code' : 'schema']: `<${scenario} check>` } } : b.input;
         console.log(`→ ${tool} ${clip(JSON.stringify(input), 140)}`);
       } else if (b.type === 'text' && b.text.trim() && b.text.length < 400) {
         // Short asides narrate decisions; the long final summary is printed in full by the result event.
